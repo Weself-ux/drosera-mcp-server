@@ -1,0 +1,59 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+@import url("https://assets.soracom.io/fonts/aeonik/Aeonik.css");
+@import url("https://assets.soracom.io/fonts/source-han-sans/SourceHanSansJP-VF.css");
+
+@font-face {
+  font-family: "Protrakt";
+  src: url(../../static/fonts/Protrakt.ttf);
+}
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #ff6a00;
+  --ifm-color-primary-dark: #ff6a00;
+  --ifm-color-primary-darker: #ff6a00;
+  --ifm-color-primary-darkest: #ff6a00;
+  --ifm-color-primary-light: #ff6a00c4;
+  --ifm-color-primary-lighter: #ff6a009a;
+  --ifm-color-primary-lightest: #ff6a0086;
+
+  --ifm-color-secondary: #fff1e8;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+
+  --ifm-font-feature-settings-primary: "ss02", "ss08";
+  --ifm-font-family-primary: Aeonik, 'Source Han Sans JP', Arial, Helvetica, sans-serif;
+  --ifm-font-family-secondary: Protrakt;
+
+  --ifm-color-info-contrast-background: #ff6a0086;
+  --ifm-color-info-dark: #ff6a00;
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+html[data-theme='dark'] {
+  --ifm-color-primary: #ff6a00;
+  --ifm-color-primary-dark: #ff6a00;
+  --ifm-color-primary-darker: #ff6a00;
+  --ifm-color-primary-darkest: #ff6a00;
+  --ifm-color-primary-light: #ff6a00c4;
+  --ifm-color-primary-lighter: #ff6a009a;
+  --ifm-color-primary-lightest: #ff6a0086;
+  
+  --ifm-color-secondary: #fff1e8;
+
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+
+  --ifm-color-info-contrast-background: #ff6a0086;
+  --ifm-color-info-dark: #ff6a00;
+}
+
+img[alt~="DroseraHighLevelArchitecture"] {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}

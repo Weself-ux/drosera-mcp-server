@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+      xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+            http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
+<!-- created with Free Online Sitemap Generator www.xml-sitemaps.com -->
+
+
+<url>
+  <loc>https://dev.drosera.io/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>1.00</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/introduction/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/getting-started/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/operators/installation/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/litepaper/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/use-cases/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.80</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/drosera-cli/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/creating-a-trap/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/updating-a-trap/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/hydrating-a-trap/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/boosting-a-trap/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/dryrunning-a-trap/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/kicking-an-operator/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/private-traps/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/setting-bloomboost-percentage/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/getting-liveness-data/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/trappers/recover-drosera-toml/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/operators/register/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/operators/run-operator/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/operators/executing-traps/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/operators/metrics/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/operators/testnet-guide/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/operators/run-on-vps/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/operators/run-with-docker/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/operators/railway/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/deployments/</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+<url>
+  <loc>https://dev.drosera.io/pdfs/DroseraLitepaper.pdf</loc>
+  <lastmod>2025-05-21T21:27:09+00:00</lastmod>
+  <priority>0.64</priority>
+</url>
+
+
+</urlset>

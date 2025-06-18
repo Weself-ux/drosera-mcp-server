@@ -1,0 +1,298 @@
+# Trap Execution Model
+
+Understanding how Drosera executes traps is crucial for proper trap development. This document explains the execution lifecycle and important constraints.
+
+## Key Execution Facts
+
+### Constructor Behavior
+**🚨 CRITICAL: Trap constructors cannot have input arguments and are called every block**
+
+```solidity
+// ❌ WRONG - This will not work
+contract MyTrap is ITrap {
+    constructor(address target, uint256 threshold) {
+        // This constructor will fail
+    }
+}
+
+// ✅ CORRECT - No arguments allowed
+contract MyTrap is ITrap {
+    constructor() {
+        // This runs every block before collect()
+        // Keep it lightweight!
+    }
+}
+```
+
+### Execution Lifecycle Per Block
+
+1. **Deploy Simulation**: Operator simulates fresh contract deployment
+2. **Constructor Call**: Constructor runs (must be parameterless)
+3. **Collect Call**: `collect()` is called to gather current state
+4. **Response Decision**: `shouldRespond()` analyzes collected data
+5. **Response Execution**: If triggered, response contract is called
+
+### Why This Matters
+
+**Every Block Deployment**: Since the constructor runs every block, you cannot:
+- Pass configuration via constructor arguments
+- Rely on constructor state persisting between blocks
+- Use constructor for one-time initialization
+
+**State Persistence**: Between blocks, no state persists. Each execution is a fresh start.
+
+## Configuration Patterns
+
+### ✅ Hardcode Configuration
+```solidity
+contract TokenMonitorTrap is ITrap {
+    // Hardcode addresses and thresholds
+    address constant TARGET_TOKEN = 0x123...;
+    uint256 constant THRESHOLD = 1000;
+    
+    constructor() {
+        // Lightweight initialization only
+    }
+}
+```
+
+### ✅ Derive from Block Data
+```solidity
+contract DynamicTrap is ITrap {
+    constructor() {
+        // Configuration based on current block
+        if (block.number > 18000000) {
+            // Different behavior for different blocks
+        }
+    }
+}
+```
+
+### ✅ Read from External Contracts
+```solidity
+contract ConfigurableTrap is ITrap {
+    address constant CONFIG_CONTRACT = 0x456...;
+    
+    function collect() external view override returns (bytes memory) {
+        // Read config from external contract each time
+        uint256 threshold = IConfig(CONFIG_CONTRACT).getThreshold();
+        // Use threshold for monitoring
+    }
+}
+```
+
+## Performance Considerations
+
+### Constructor Efficiency
+Since constructors run every block, keep them minimal:
+
+```solidity
+constructor() {
+    // ✅ OK - Simple assignments
+    someValue = 42;
+    
+    // ❌ AVOID - External calls
+    externalContract.getData();
+    
+    // ❌ AVOID - Complex computation
+    for (uint i = 0; i < 1000; i++) { /* heavy work */ }
+}
+```
+
+### State Access Patterns
+```solidity
+contract EfficientTrap is ITrap {
+    // ✅ Use immutable for constants
+    uint256 immutable THRESHOLD = 1000;
+    
+    // ✅ Use constant for addresses
+    address constant TARGET = 0x123...;
+    
+    function collect() external view override returns (bytes memory) {
+        // ✅ Efficient state reading
+        uint256 balance = IERC20(TARGET).balanceOf(address(this));
+        return abi.encode(balance, THRESHOLD);
+    }
+}
+```
+
+## Common Mistakes to Avoid
+
+### ❌ Constructor Arguments
+```solidity
+// This will break the trap execution
+constructor(address _target, uint256 _threshold) {
+    target = _target;
+    threshold = _threshold;
+}
+```
+
+### ❌ Persistent State Assumptions
+```solidity
+contract BrokenTrap is ITrap {
+    uint256 public lastValue;
+    
+    function collect() external view override returns (bytes memory) {
+        // ❌ lastValue will always be 0 since constructor runs every block
+        uint256 currentValue = getCurrentValue();
+        uint256 change = currentValue - lastValue; // Always equals currentValue
+        return abi.encode(change);
+    }
+}
+```
+
+### ❌ Heavy Constructor Logic
+```solidity
+constructor() {
+    // ❌ This runs every block - too expensive
+    for (uint i = 0; i < protocols.length; i++) {
+        protocolData[i] = IProtocol(protocols[i]).getAllData();
+    }
+}
+```
+
+## Best Practices
+
+### 1. Hardcode Critical Values
+```solidity
+contract BestPracticeTrap is ITrap {
+    // ✅ Compile-time constants
+    address constant MONITORED_VAULT = 0x123...;
+    uint256 constant LIQUIDATION_THRESHOLD = 8500; // 85%
+    uint256 constant MAX_SLIPPAGE = 300; // 3%
+    
+    constructor() {} // Empty or minimal logic only
+}
+```
+
+### 2. Use Immutable for Computed Constants
+```solidity
+contract ComputedConstantsTrap is ITrap {
+    uint256 immutable SCALED_THRESHOLD;
+    
+    constructor() {
+        // ✅ One-time computation is OK
+        SCALED_THRESHOLD = 1000 * 1e18;
+    }
+}
+```
+
+### 3. Configuration via External Contracts
+```solidity
+contract ConfigurableTrap is ITrap {
+    address constant CONFIG_REGISTRY = 0x456...;
+    
+    function collect() external view override returns (bytes memory) {
+        // ✅ Read configuration fresh each block
+        TrapConfig memory config = IRegistry(CONFIG_REGISTRY).getTrapConfig();
+        
+        uint256 currentValue = getMonitoredValue();
+        bool violation = currentValue > config.threshold;
+        
+        return abi.encode(currentValue, config.threshold, violation);
+    }
+}
+```
+
+### 4. Efficient Data Structures
+```solidity
+contract EfficientDataTrap is ITrap {
+    // ✅ Use structs for related data
+    struct MonitoringParams {
+        address target;
+        uint256 threshold;
+        uint256 cooldown;
+    }
+    
+    // ✅ Hardcode struct data
+    MonitoringParams constant PARAMS = MonitoringParams({
+        target: 0x123...,
+        threshold: 1000,
+        cooldown: 100
+    });
+}
+```
+
+## Testing Implications
+
+### Test Constructor Behavior
+```solidity
+function testConstructorCalledEveryBlock() public {
+    // Deploy trap
+    MyTrap trap1 = new MyTrap();
+    bytes memory data1 = trap1.collect();
+    
+    // Deploy again (simulates next block)
+    MyTrap trap2 = new MyTrap();
+    bytes memory data2 = trap2.collect();
+    
+    // Both should work independently
+    assertEq(data1.length, data2.length);
+}
+```
+
+### Test Configuration Consistency
+```solidity
+function testHardcodedValues() public {
+    MyTrap trap = new MyTrap();
+    
+    // ✅ These should be consistent across deployments
+    assertEq(trap.TARGET_ADDRESS(), expectedAddress);
+    assertEq(trap.THRESHOLD(), expectedThreshold);
+}
+```
+
+## Migration from Constructor Arguments
+
+If you have a trap with constructor arguments, refactor like this:
+
+### Before (Broken)
+```solidity
+contract OldTrap is ITrap {
+    address public target;
+    uint256 public threshold;
+    
+    constructor(address _target, uint256 _threshold) {
+        target = _target;
+        threshold = _threshold;
+    }
+}
+```
+
+### After (Fixed)
+```solidity
+contract NewTrap is ITrap {
+    address constant TARGET = 0x123...; // Hardcode the specific address
+    uint256 constant THRESHOLD = 1000;   // Hardcode the specific threshold
+    
+    constructor() {} // No arguments
+}
+```
+
+Or use a factory pattern:
+
+```solidity
+contract ConfigurableBaseTrapp is ITrap {
+    address constant CONFIG_FACTORY = 0x789...;
+    
+    function collect() external view override returns (bytes memory) {
+        // Get trap-specific config based on trap address
+        (address target, uint256 threshold) = IFactory(CONFIG_FACTORY)
+            .getTrapConfig(address(this));
+            
+        // Use target and threshold for monitoring
+        uint256 value = IERC20(target).balanceOf(someAddress);
+        return abi.encode(value, threshold, value > threshold);
+    }
+}
+```
+
+## Summary
+
+- **No constructor arguments** - hardcode or read from external contracts
+- **Constructor runs every block** - keep it lightweight
+- **No persistent state** - each execution is independent
+- **Use constants/immutable** for efficiency
+- **Test constructor behavior** to ensure correctness
+
+Understanding this execution model is fundamental to building reliable Drosera traps.

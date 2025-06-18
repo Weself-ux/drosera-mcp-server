@@ -1,0 +1,36 @@
+{
+  "interface": "ISwapRouter",
+  "description": "Interface for Uniswap V3 swap router contract",
+  "functions": [
+    {
+      "name": "exactInputSingle",
+      "signature": "function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut)",
+      "description": "Swaps amountIn of one token for as much as possible of another token"
+    },
+    {
+      "name": "exactOutputSingle", 
+      "signature": "function exactOutputSingle(ExactOutputSingleParams calldata params) external payable returns (uint256 amountIn)",
+      "description": "Swaps as little as possible of one token for amountOut of another token"
+    },
+    {
+      "name": "exactInput",
+      "signature": "function exactInput(ExactInputParams calldata params) external payable returns (uint256 amountOut)",
+      "description": "Swaps amountIn of one token for as much as possible of another along the specified path"
+    },
+    {
+      "name": "exactOutput",
+      "signature": "function exactOutput(ExactOutputParams calldata params) external payable returns (uint256 amountIn)", 
+      "description": "Swaps as little as possible of one token for amountOut of another along the specified path"
+    }
+  ],
+  "structs": [
+    {
+      "name": "ExactInputSingleParams",
+      "fields": "tokenIn, tokenOut, fee, recipient, deadline, amountIn, amountOutMinimum, sqrtPriceLimitX96"
+    },
+    {
+      "name": "ExactOutputSingleParams", 
+      "fields": "tokenIn, tokenOut, fee, recipient, deadline, amountOut, amountInMaximum, sqrtPriceLimitX96"
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "interface": "INonfungiblePositionManager",
+  "description": "Interface for Uniswap V3 nonfungible position manager",
+  "functions": [
+    {
+      "name": "mint",
+      "signature": "function mint(MintParams calldata params) external payable returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)",
+      "description": "Creates a new position wrapped in a NFT"
+    },
+    {
+      "name": "increaseLiquidity",
+      "signature": "function increaseLiquidity(IncreaseLiquidityParams calldata params) external payable returns (uint128 liquidity, uint256 amount0, uint256 amount1)",
+      "description": "Increases liquidity in the current range"
+    },
+    {
+      "name": "decreaseLiquidity", 
+      "signature": "function decreaseLiquidity(DecreaseLiquidityParams calldata params) external payable returns (uint256 amount0, uint256 amount1)",
+      "description": "Decreases liquidity in the current range"
+    },
+    {
+      "name": "collect",
+      "signature": "function collect(CollectParams calldata params) external payable returns (uint256 amount0, uint256 amount1)",
+      "description": "Collects up to a maximum amount of fees owed to a specific position to the recipient"
+    },
+    {
+      "name": "positions",
+      "signature": "function positions(uint256 tokenId) external view returns (uint96 nonce, address operator, address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)",
+      "description": "Returns the position information associated with a given token ID"
+    }
+  ],
+  "structs": [
+    {
+      "name": "MintParams",
+      "fields": "token0, token1, fee, tickLower, tickUpper, amount0Desired, amount1Desired, amount0Min, amount1Min, recipient, deadline"
+    },
+    {
+      "name": "CollectParams",
+      "fields": "tokenId, recipient, amount0Max, amount1Max"
+    }
+  ]
+}

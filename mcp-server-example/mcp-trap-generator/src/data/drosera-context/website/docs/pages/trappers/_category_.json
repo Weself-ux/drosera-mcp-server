@@ -1,0 +1,8 @@
+{
+  "label": "Trappers",
+  "position": 3,
+  "link": {
+    "type": "generated-index",
+    "description": "Smart contracts used for configuration and defining conditions for on-chain responses."
+  }
+}

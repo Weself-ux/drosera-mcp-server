@@ -1,0 +1,48 @@
+{
+  "interface": "IUniswapV3Pool",
+  "description": "Interface for Uniswap V3 pool contracts",
+  "functions": [
+    {
+      "name": "slot0",
+      "signature": "function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, uint8 feeProtocol, bool unlocked)",
+      "description": "Returns the current price and tick information"
+    },
+    {
+      "name": "liquidity", 
+      "signature": "function liquidity() external view returns (uint128)",
+      "description": "Returns the current liquidity in the pool"
+    },
+    {
+      "name": "token0",
+      "signature": "function token0() external view returns (address)",
+      "description": "Returns the address of token0"
+    },
+    {
+      "name": "token1", 
+      "signature": "function token1() external view returns (address)",
+      "description": "Returns the address of token1"
+    },
+    {
+      "name": "fee",
+      "signature": "function fee() external view returns (uint24)",
+      "description": "Returns the pool fee in hundredths of a bip"
+    },
+    {
+      "name": "tickSpacing",
+      "signature": "function tickSpacing() external view returns (int24)",
+      "description": "Returns the tick spacing for the pool"
+    }
+  ],
+  "events": [
+    {
+      "name": "Swap",
+      "signature": "Swap(address indexed sender, address indexed recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)",
+      "description": "Emitted when tokens are swapped"
+    },
+    {
+      "name": "Mint",
+      "signature": "Mint(address sender, address indexed owner, int24 indexed tickLower, int24 indexed tickUpper, uint128 amount, uint256 amount0, uint256 amount1)",
+      "description": "Emitted when liquidity is added"
+    }
+  ]
+}

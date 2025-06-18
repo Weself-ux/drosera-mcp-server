@@ -1,0 +1,33 @@
+{
+  "interface": "IUniswapV3Factory",
+  "description": "Interface for Uniswap V3 factory contract",
+  "functions": [
+    {
+      "name": "getPool",
+      "signature": "function getPool(address tokenA, address tokenB, uint24 fee) external view returns (address pool)",
+      "description": "Returns the pool address for given token pair and fee"
+    },
+    {
+      "name": "createPool",
+      "signature": "function createPool(address tokenA, address tokenB, uint24 fee) external returns (address pool)",
+      "description": "Creates a new pool for the given tokens and fee"
+    },
+    {
+      "name": "owner",
+      "signature": "function owner() external view returns (address)",
+      "description": "Returns the current owner of the factory"
+    },
+    {
+      "name": "feeAmountTickSpacing",
+      "signature": "function feeAmountTickSpacing(uint24 fee) external view returns (int24)",
+      "description": "Returns the tick spacing for the given fee amount"
+    }
+  ],
+  "events": [
+    {
+      "name": "PoolCreated",
+      "signature": "PoolCreated(address indexed token0, address indexed token1, uint24 indexed fee, int24 tickSpacing, address pool)",
+      "description": "Emitted when a new pool is created"
+    }
+  ]
+}
