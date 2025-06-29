@@ -1,0 +1,17 @@
+ethereum_rpc = "https://geth.devnet.drosera.io"
+drosera_rpc = "https://relay.devnet.drosera.io"
+drosera_address = "0x7E1b5cA35bd6BcAe8Ff33C0dDf79EffCFf0Ad19e"
+
+[traps]
+
+[traps.scheduler]
+path = "out/SchedulerTrap.sol/SchedulerTrap.json"
+response_contract = "0x0000000000000000000000000000000000000000" # placeholder - would be actual response contract address
+response_function = "executeScheduledAction(uint256,string)" # function to call when target block/time reached
+cooldown_period_blocks = 100 # prevent rapid re-triggering
+min_number_of_operators = 1
+max_number_of_operators = 3
+block_sample_size = 10
+private_trap = false
+whitelist = []
+address = "0x0000000000000000000000000000000000000000" # placeholder - would be deployed trap address
