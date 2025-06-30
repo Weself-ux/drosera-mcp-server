@@ -6,7 +6,6 @@ pragma solidity ^0.8.19;
  * @notice Response contract for handling AAVE liquidation alerts
  */
 contract AaveLiquidationResponse {
-    
     event LiquidationTriggered(address indexed user, uint256 timestamp);
 
     // State to track if response was triggered
@@ -38,12 +37,15 @@ contract AaveLiquidationResponse {
         address debtAsset,
         uint256 debtToCover
     ) external onlyTrapConfig {
+        // NOTE: This is a simplified example of a response but can be extended to real world use cases.
         liquidationTriggered[user] = true;
         emit LiquidationTriggered(user, block.timestamp);
     }
 
     // View function for testing
-    function wasLiquidationTriggered(address user) external view returns (bool) {
+    function wasLiquidationTriggered(
+        address user
+    ) external view returns (bool) {
         return liquidationTriggered[user];
     }
 }
