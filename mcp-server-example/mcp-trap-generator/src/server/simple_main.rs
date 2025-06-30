@@ -13,6 +13,7 @@ struct DroseraServer {
     protocols: HashMap<String, Value>,
     drosera_context: HashMap<String, Value>,
     trap_examples: HashMap<String, Value>,
+    prompts: HashMap<String, String>,
 }
 
 impl DroseraServer {
@@ -21,10 +22,12 @@ impl DroseraServer {
             protocols: HashMap::new(),
             drosera_context: HashMap::new(),
             trap_examples: HashMap::new(),
+            prompts: HashMap::new(),
         };
         server.load_protocols()?;
         server.load_drosera_context()?;
         server.load_trap_examples()?;
+        server.load_prompts()?;
         Ok(server)
     }
 
@@ -228,6 +231,49 @@ impl DroseraServer {
                 }
             }
         }
+        
+        Ok(())
+    }
+
+    fn load_prompts(&mut self) -> Result<()> {
+        let prompts_dir = Path::new("src/data/prompts");
+        
+        if !prompts_dir.exists() {
+            info!("Prompts directory not found");
+            return Ok(());
+        }
+
+        // Load the main trap generation prompt and combine with other guides
+        let mut combined_prompt = String::new();
+        
+        // Load main prompt
+        let main_prompt_path = prompts_dir.join("trap-generation-prompt.md");
+        if main_prompt_path.exists() {
+            let main_content = fs::read_to_string(&main_prompt_path)?;
+            combined_prompt.push_str(&main_content);
+        }
+
+        // Add references to other guides
+        combined_prompt.push_str("\n\n## Additional Reference Guides\n\n");
+        
+        // Load testing guide
+        let testing_guide_path = prompts_dir.join("trap-testing-guide.md");
+        if testing_guide_path.exists() {
+            let testing_content = fs::read_to_string(&testing_guide_path)?;
+            combined_prompt.push_str("### Testing Guide\n\n");
+            combined_prompt.push_str(&testing_content);
+        }
+
+        // Load quick reference
+        let quick_ref_path = prompts_dir.join("quick-reference.md");
+        if quick_ref_path.exists() {
+            let quick_ref_content = fs::read_to_string(&quick_ref_path)?;
+            combined_prompt.push_str("\n\n### Quick Reference\n\n");
+            combined_prompt.push_str(&quick_ref_content);
+        }
+
+        self.prompts.insert("generate-trap".to_string(), combined_prompt);
+        info!("Loaded trap generation prompt");
         
         Ok(())
     }
@@ -516,9 +562,71 @@ impl DroseraServer {
                     "jsonrpc": "2.0",
                     "id": id,
                     "result": {
-                        "prompts": []
+                        "prompts": [
+                            {
+                                "name": "generate-trap",
+                                "description": "Generate a Drosera Trap based on monitoring requirements. Includes comprehensive guidance on trap patterns, testing, and best practices.",
+                                "arguments": [
+                                    {
+                                        "name": "monitoring_type",
+                                        "description": "Type of monitoring scenario (e.g., oracle, liquidity, fee, access-control, bridge)",
+                                        "required": false
+                                    },
+                                    {
+                                        "name": "protocol",
+                                        "description": "Specific protocol to monitor (e.g., Aave, Uniswap, Compound)",
+                                        "required": false
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 }))
+            }
+            "prompts/get" => {
+                let prompt_name = request["params"]["name"].as_str().unwrap_or("");
+                
+                match prompt_name {
+                    "generate-trap" => {
+                        if let Some(prompt_content) = self.prompts.get("generate-trap") {
+                            Ok(json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "result": {
+                                    "description": "Generate a Drosera Trap based on monitoring requirements",
+                                    "messages": [
+                                        {
+                                            "role": "system",
+                                            "content": {
+                                                "type": "text",
+                                                "text": prompt_content
+                                            }
+                                        }
+                                    ]
+                                }
+                            }))
+                        } else {
+                            Ok(json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "error": {
+                                    "code": -32603,
+                                    "message": "Prompt content not loaded"
+                                }
+                            }))
+                        }
+                    }
+                    _ => {
+                        Ok(json!({
+                            "jsonrpc": "2.0",
+                            "id": id,
+                            "error": {
+                                "code": -32602,
+                                "message": format!("Unknown prompt: {}", prompt_name)
+                            }
+                        }))
+                    }
+                }
             }
             _ => {
                 Ok(json!({
