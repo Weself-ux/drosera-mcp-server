@@ -127,26 +127,34 @@ contract AaveLiquidationTrap is ITrap {
         }
 
         if (alertCount > 0) {
-            LiquidationAlert[] memory result = new LiquidationAlert[](
-                alertCount
+            // Return the first alert's data in the format expected by response_function:
+            // liquidatePosition(address,address,address,uint256)
+            LiquidationAlert memory firstAlert = alerts[0];
+            return (
+                true,
+                abi.encode(
+                    firstAlert.user, // user to liquidate
+                    address(0), // collateral asset (would be determined by TrapConfig)
+                    address(0), // debt asset (would be determined by TrapConfig)
+                    firstAlert.totalDebt // debt amount to cover
+                )
             );
-            for (uint256 i = 0; i < alertCount; i++) {
-                result[i] = alerts[i];
-            }
-            return (true, abi.encode(result));
         }
 
         return (false, "");
     }
 
+    // NOTE: For testing purposes only
     function getMonitoredUsers() external view returns (address[] memory) {
         return monitoredUsers;
     }
 
+    // NOTE: For testing purposes only
     function addMonitoredUser(address user) external {
         monitoredUsers.push(user);
     }
 
+    // NOTE: For testing purposes only
     function getLiquidationThreshold() external pure returns (uint256) {
         return LIQUIDATION_THRESHOLD;
     }

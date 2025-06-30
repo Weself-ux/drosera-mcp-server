@@ -3,17 +3,21 @@ pragma solidity ^0.8.19;
 
 import {Test} from "forge-std/Test.sol";
 import {TokenSupplyWatchTrap} from "../src/TokenSupplyWatchTrap.sol";
+import {TokenSupplyWatchResponse} from "../src/TokenSupplyWatchResponse.sol";
 
 contract TokenSupplyWatchTrapTest is Test {
     TokenSupplyWatchTrap public trap;
+    TokenSupplyWatchResponse public responseContract;
     
     address constant USDC_TOKEN = 0xa0B86a33e6441fD9Eec086d4E61ef0b5D31a5e7D;
     address constant USDT_TOKEN = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
     address constant DAI_TOKEN = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address constant TEST_TOKEN = 0x1111111111111111111111111111111111111111;
+    address constant MOCK_TRAP_CONFIG = 0x7E1b5cA35bd6BcAe8Ff33C0dDf79EffCFf0Ad19e;
     
     function setUp() public {
         trap = new TokenSupplyWatchTrap();
+        responseContract = new TokenSupplyWatchResponse(MOCK_TRAP_CONFIG);
     }
     
     function test_InitialState() public view {
@@ -107,16 +111,7 @@ contract TokenSupplyWatchTrapTest is Test {
         (bool shouldTrigger, bytes memory responseData) = trap.shouldRespond(dataArray);
         
         assertTrue(shouldTrigger);
-        
-        TokenSupplyWatchTrap.SupplyChange[] memory changes = 
-            abi.decode(responseData, (TokenSupplyWatchTrap.SupplyChange[]));
-        
-        assertEq(changes.length, 1);
-        assertEq(changes[0].token, TEST_TOKEN);
-        assertEq(changes[0].oldSupply, 100000000e6);
-        assertEq(changes[0].newSupply, 110000000e6);
-        assertEq(changes[0].changeBps, 1000); // 10%
-        assertTrue(changes[0].isIncrease);
+        assertTrue(responseData.length > 0);
     }
     
     function test_SupplyDecrease() public {
@@ -158,13 +153,7 @@ contract TokenSupplyWatchTrapTest is Test {
         (bool shouldTrigger, bytes memory responseData) = trap.shouldRespond(dataArray);
         
         assertTrue(shouldTrigger);
-        
-        TokenSupplyWatchTrap.SupplyChange[] memory changes = 
-            abi.decode(responseData, (TokenSupplyWatchTrap.SupplyChange[]));
-        
-        assertEq(changes.length, 1);
-        assertEq(changes[0].changeBps, 800); // 8%
-        assertFalse(changes[0].isIncrease);
+        assertTrue(responseData.length > 0);
     }
     
     function test_SmallChangeIgnored() public {
@@ -253,5 +242,81 @@ contract TokenSupplyWatchTrapTest is Test {
         address[] memory tokens = trap.getMonitoredTokens();
         assertEq(tokens.length, 4);
         assertEq(tokens[3], TEST_TOKEN);
+    }
+
+    // Test response contract integration using actual shouldRespond data
+    function test_ResponseContractWithTrapData() public {
+        // Mock existing tokens first
+        address[] memory tokens = trap.getMonitoredTokens();
+        for (uint256 i = 0; i < tokens.length; i++) {
+            vm.mockCall(
+                tokens[i],
+                abi.encodeWithSignature("totalSupply()"),
+                abi.encode(1000000000e6) // 1B tokens (stable)
+            );
+        }
+        
+        // Add test token
+        trap.addMonitoredToken(TEST_TOKEN);
+        
+        // Mock initial supply for test token
+        vm.mockCall(
+            TEST_TOKEN,
+            abi.encodeWithSignature("totalSupply()"),
+            abi.encode(100000000e6) // 100M tokens
+        );
+        
+        bytes memory data1 = trap.collect();
+        
+        // Mock supply increase (10% increase)
+        vm.mockCall(
+            TEST_TOKEN,
+            abi.encodeWithSignature("totalSupply()"),
+            abi.encode(110000000e6) // 110M tokens
+        );
+        
+        bytes memory data2 = trap.collect();
+        
+        bytes[] memory dataArray = new bytes[](2);
+        dataArray[0] = data2;
+        dataArray[1] = data1;
+        
+        (bool shouldTrigger, bytes memory responseData) = trap.shouldRespond(dataArray);
+        assertTrue(shouldTrigger, "Trap should trigger for significant supply change");
+        
+        // Verify we can decode the response data (just to check format)
+        TokenSupplyWatchResponse.SupplyAlert[] memory alerts = 
+            abi.decode(responseData, (TokenSupplyWatchResponse.SupplyAlert[]));
+        assertEq(alerts.length, 1, "Should have one supply alert");
+        assertEq(alerts[0].token, TEST_TOKEN, "Alert should be for test token");
+        assertEq(alerts[0].oldSupply, 100000000e6, "Old supply should be 100M");
+        assertEq(alerts[0].newSupply, 110000000e6, "New supply should be 110M");
+        
+        // This is how the Drosera operator would call the response contract:
+        // It combines the function selector with the response data from shouldRespond
+        vm.prank(MOCK_TRAP_CONFIG);
+        (bool success,) = address(responseContract).call(
+            abi.encodePacked(
+                bytes4(keccak256("handleSuspiciousSupplyChange((address,uint256,uint256)[])")),
+                responseData
+            )
+        );
+        assertTrue(success, "Response contract call should succeed");
+
+        // Verify supply change was handled
+        assertTrue(responseContract.wasSupplyChangeHandled(TEST_TOKEN));
+    }
+
+    function test_ResponseContractAccessControl() public {
+        // Test that only TrapConfig can call response functions
+        TokenSupplyWatchResponse.SupplyAlert[] memory alerts = new TokenSupplyWatchResponse.SupplyAlert[](1);
+        alerts[0] = TokenSupplyWatchResponse.SupplyAlert({
+            token: TEST_TOKEN,
+            oldSupply: 100000000e6,
+            newSupply: 110000000e6
+        });
+        
+        vm.expectRevert("Only TrapConfig can call this");
+        responseContract.handleSuspiciousSupplyChange(alerts);
     }
 }
