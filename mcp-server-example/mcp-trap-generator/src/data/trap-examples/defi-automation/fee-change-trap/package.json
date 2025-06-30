@@ -1,5 +1,5 @@
 {
-  "name": "@trap-examples/defi-automation/fee-change-monitor",
+  "name": "@trap-examples/defi-automation/fee-change-trap",
   "version": "1.0.0",
   "devDependencies": {
     "forge-std": "github:foundry-rs/forge-std#v1.8.1"

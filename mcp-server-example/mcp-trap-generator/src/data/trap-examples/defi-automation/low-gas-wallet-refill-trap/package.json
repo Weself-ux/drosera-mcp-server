@@ -1,5 +1,5 @@
 {
-  "name": "@trap-examples/defi-automation/liquidity-pool-health-monitor",
+  "name": "@trap-examples/defi-automation/low-gas-wallet-refill-trap",
   "version": "1.0.0",
   "devDependencies": {
     "forge-std": "github:foundry-rs/forge-std#v1.8.1"
