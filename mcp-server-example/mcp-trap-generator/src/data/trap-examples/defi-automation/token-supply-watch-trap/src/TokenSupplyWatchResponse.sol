@@ -6,13 +6,12 @@ pragma solidity ^0.8.19;
  * @notice Response contract for handling suspicious token supply changes
  */
 contract TokenSupplyWatchResponse {
-    
     struct SupplyAlert {
         address token;
         uint256 oldSupply;
         uint256 newSupply;
     }
-    
+
     event SuspiciousSupplyChangeHandled(uint256 alertCount, uint256 timestamp);
 
     // State to track responses
@@ -38,6 +37,7 @@ contract TokenSupplyWatchResponse {
     function handleSuspiciousSupplyChange(
         SupplyAlert[] calldata alerts
     ) external onlyTrapConfig {
+        // NOTE: This is a simplified example of a response but can be extended to real world use cases.
         for (uint256 i = 0; i < alerts.length; i++) {
             supplyChangeHandled[alerts[i].token] = true;
         }
@@ -45,7 +45,9 @@ contract TokenSupplyWatchResponse {
     }
 
     // View function for testing
-    function wasSupplyChangeHandled(address token) external view returns (bool) {
+    function wasSupplyChangeHandled(
+        address token
+    ) external view returns (bool) {
         return supplyChangeHandled[token];
     }
 }

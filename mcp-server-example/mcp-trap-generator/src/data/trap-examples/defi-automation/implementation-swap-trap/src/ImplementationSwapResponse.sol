@@ -6,8 +6,13 @@ pragma solidity ^0.8.19;
  * @notice Response contract for handling proxy upgrade alerts
  */
 contract ImplementationSwapResponse {
-    
-    event ProxyUpgradeHandled(address indexed proxy, address oldImpl, address newImpl, string changeType, uint256 timestamp);
+    event ProxyUpgradeHandled(
+        address indexed proxy,
+        address oldImpl,
+        address newImpl,
+        string changeType,
+        uint256 timestamp
+    );
 
     // State to track responses
     mapping(address => bool) public upgradeHandled;
@@ -38,8 +43,15 @@ contract ImplementationSwapResponse {
         address newImplementation,
         string calldata changeType
     ) external onlyTrapConfig {
+        // NOTE: This is a simplified example of a response but can be extended to real world use cases.
         upgradeHandled[proxy] = true;
-        emit ProxyUpgradeHandled(proxy, oldImplementation, newImplementation, changeType, block.timestamp);
+        emit ProxyUpgradeHandled(
+            proxy,
+            oldImplementation,
+            newImplementation,
+            changeType,
+            block.timestamp
+        );
     }
 
     // View function for testing

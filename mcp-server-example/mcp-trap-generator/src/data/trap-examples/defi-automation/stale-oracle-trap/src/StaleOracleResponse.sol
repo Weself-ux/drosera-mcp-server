@@ -7,7 +7,6 @@ pragma solidity ^0.8.19;
  * @dev Handles responses when oracle data becomes stale or outdated
  */
 contract StaleOracleResponse {
-    
     // Events for tracking response actions
     event StaleOracleAlerted(
         address indexed oracle,
@@ -46,10 +45,17 @@ contract StaleOracleResponse {
         uint256 updatedAt,
         uint256 staleness
     ) external onlyTrapConfig {
+        // NOTE: This is a simplified example of a response but can be extended to real world use cases.
         // Record that oracle was alerted
         oracleAlerted[oracle] = true;
 
-        emit StaleOracleAlerted(oracle, price, updatedAt, staleness, block.timestamp);
+        emit StaleOracleAlerted(
+            oracle,
+            price,
+            updatedAt,
+            staleness,
+            block.timestamp
+        );
 
         // In a real implementation, this could:
         // 1. Pause protocols that depend on this oracle

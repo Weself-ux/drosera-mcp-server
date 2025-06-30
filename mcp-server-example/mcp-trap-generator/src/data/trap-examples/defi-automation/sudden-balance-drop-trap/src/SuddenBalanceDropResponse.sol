@@ -6,8 +6,12 @@ pragma solidity ^0.8.19;
  * @notice Response contract for handling sudden balance drop alerts
  */
 contract SuddenBalanceDropResponse {
-    
-    event BalanceDropHandled(address indexed vault, uint256 oldBalance, uint256 newBalance, uint256 timestamp);
+    event BalanceDropHandled(
+        address indexed vault,
+        uint256 oldBalance,
+        uint256 newBalance,
+        uint256 timestamp
+    );
 
     // State to track responses
     mapping(address => bool) public balanceDropHandled;
@@ -36,6 +40,7 @@ contract SuddenBalanceDropResponse {
         uint256 oldBalance,
         uint256 newBalance
     ) external onlyTrapConfig {
+        // NOTE: This is a simplified example of a response but can be extended to real world use cases.
         balanceDropHandled[vault] = true;
         emit BalanceDropHandled(vault, oldBalance, newBalance, block.timestamp);
     }

@@ -6,7 +6,6 @@ pragma solidity ^0.8.19;
  * @notice Response contract for handling unhealthy liquidity pool alerts
  */
 contract LiquidityPoolHealthResponse {
-    
     struct PoolHealthAlert {
         address pool;
         address token0;
@@ -17,7 +16,7 @@ contract LiquidityPoolHealthResponse {
         uint256 currentRatio;
         bool isHealthy;
     }
-    
+
     event UnhealthyPoolsHandled(uint256 poolCount, uint256 timestamp);
 
     // State to track responses
@@ -43,6 +42,7 @@ contract LiquidityPoolHealthResponse {
     function handleUnhealthyPools(
         PoolHealthAlert[] calldata alerts
     ) external onlyTrapConfig {
+        // NOTE: This is a simplified example of a response but can be extended to real world use cases.
         for (uint256 i = 0; i < alerts.length; i++) {
             poolHealthHandled[alerts[i].pool] = true;
         }
