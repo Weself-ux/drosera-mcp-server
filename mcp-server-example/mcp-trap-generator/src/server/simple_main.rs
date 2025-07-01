@@ -14,6 +14,7 @@ struct DroseraServer {
     drosera_context: HashMap<String, Value>,
     trap_examples: HashMap<String, Value>,
     prompts: HashMap<String, String>,
+    index: Option<Value>,
 }
 
 impl DroseraServer {
@@ -23,11 +24,13 @@ impl DroseraServer {
             drosera_context: HashMap::new(),
             trap_examples: HashMap::new(),
             prompts: HashMap::new(),
+            index: None,
         };
         server.load_protocols()?;
         server.load_drosera_context()?;
         server.load_trap_examples()?;
         server.load_prompts()?;
+        server.load_index()?;
         Ok(server)
     }
 
@@ -155,6 +158,22 @@ impl DroseraServer {
             }
         }
         
+        // Load general documentation files (introduction, use-cases, etc.)
+        let general_docs = ["introduction", "use-cases", "deployments", "litepaper"];
+        for doc_name in general_docs {
+            let doc_path = context_dir.join("website/docs/pages").join(format!("{}.md", doc_name));
+            if doc_path.exists() {
+                let content = fs::read_to_string(&doc_path)?;
+                let key = format!("general/{}", doc_name);
+                self.drosera_context.insert(key, json!({
+                    "type": "documentation",
+                    "category": "general",
+                    "content": content,
+                    "path": doc_path.to_string_lossy()
+                }));
+            }
+        }
+        
         Ok(())
     }
 
@@ -278,6 +297,21 @@ impl DroseraServer {
         Ok(())
     }
 
+    fn load_index(&mut self) -> Result<()> {
+        let index_path = Path::new("src/data/index.json");
+        
+        if index_path.exists() {
+            let content = fs::read_to_string(index_path)?;
+            let index_data: Value = serde_json::from_str(&content)?;
+            self.index = Some(index_data);
+            info!("Loaded context index");
+        } else {
+            info!("Context index not found");
+        }
+        
+        Ok(())
+    }
+
 }
 
 impl DroseraServer {
@@ -393,6 +427,16 @@ impl DroseraServer {
                         "uri": format!("trap-example://{}", example_name),
                         "name": format!("{} Trap Example", example_name.replace('-', " ").chars().collect::<String>()),
                         "description": format!("Complete trap example: {}", example_name),
+                        "mimeType": "application/json"
+                    }));
+                }
+
+                // Add context index resource
+                if self.index.is_some() {
+                    resources.push(json!({
+                        "uri": "index://context",
+                        "name": "Context Index",
+                        "description": "Cross-reference index for all protocols, examples, and documentation",
                         "mimeType": "application/json"
                     }));
                 }
@@ -543,6 +587,39 @@ impl DroseraServer {
                             "error": {
                                 "code": -32602,
                                 "message": format!("Trap example '{}' not found", example_name)
+                            }
+                        }));
+                    }
+                } else if uri.starts_with("index://") {
+                    if uri == "index://context" {
+                        if let Some(index_data) = &self.index {
+                            return Ok(json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "result": {
+                                    "contents": [{
+                                        "type": "text",
+                                        "text": serde_json::to_string_pretty(&index_data)?
+                                    }]
+                                }
+                            }));
+                        } else {
+                            return Ok(json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "error": {
+                                    "code": -32602,
+                                    "message": "Context index not available"
+                                }
+                            }));
+                        }
+                    } else {
+                        return Ok(json!({
+                            "jsonrpc": "2.0",
+                            "id": id,
+                            "error": {
+                                "code": -32602,
+                                "message": format!("Unknown index URI: {}", uri)
                             }
                         }));
                     }
