@@ -13,6 +13,8 @@ struct DroseraServer {
     protocols: HashMap<String, Value>,
     drosera_context: HashMap<String, Value>,
     trap_examples: HashMap<String, Value>,
+    prompts: HashMap<String, String>,
+    index: Option<Value>,
 }
 
 impl DroseraServer {
@@ -21,10 +23,14 @@ impl DroseraServer {
             protocols: HashMap::new(),
             drosera_context: HashMap::new(),
             trap_examples: HashMap::new(),
+            prompts: HashMap::new(),
+            index: None,
         };
         server.load_protocols()?;
         server.load_drosera_context()?;
         server.load_trap_examples()?;
+        server.load_prompts()?;
+        server.load_index()?;
         Ok(server)
     }
 
@@ -152,6 +158,22 @@ impl DroseraServer {
             }
         }
         
+        // Load general documentation files (introduction, use-cases, etc.)
+        let general_docs = ["introduction", "use-cases", "deployments", "litepaper"];
+        for doc_name in general_docs {
+            let doc_path = context_dir.join("website/docs/pages").join(format!("{}.md", doc_name));
+            if doc_path.exists() {
+                let content = fs::read_to_string(&doc_path)?;
+                let key = format!("general/{}", doc_name);
+                self.drosera_context.insert(key, json!({
+                    "type": "documentation",
+                    "category": "general",
+                    "content": content,
+                    "path": doc_path.to_string_lossy()
+                }));
+            }
+        }
+        
         Ok(())
     }
 
@@ -227,6 +249,64 @@ impl DroseraServer {
                     self.trap_examples.insert(example_name.to_string(), example_data);
                 }
             }
+        }
+        
+        Ok(())
+    }
+
+    fn load_prompts(&mut self) -> Result<()> {
+        let prompts_dir = Path::new("src/data/prompts");
+        
+        if !prompts_dir.exists() {
+            info!("Prompts directory not found");
+            return Ok(());
+        }
+
+        // Load the main trap generation prompt and combine with other guides
+        let mut combined_prompt = String::new();
+        
+        // Load main prompt
+        let main_prompt_path = prompts_dir.join("trap-generation-prompt.md");
+        if main_prompt_path.exists() {
+            let main_content = fs::read_to_string(&main_prompt_path)?;
+            combined_prompt.push_str(&main_content);
+        }
+
+        // Add references to other guides
+        combined_prompt.push_str("\n\n## Additional Reference Guides\n\n");
+        
+        // Load testing guide
+        let testing_guide_path = prompts_dir.join("trap-testing-guide.md");
+        if testing_guide_path.exists() {
+            let testing_content = fs::read_to_string(&testing_guide_path)?;
+            combined_prompt.push_str("### Testing Guide\n\n");
+            combined_prompt.push_str(&testing_content);
+        }
+
+        // Load quick reference
+        let quick_ref_path = prompts_dir.join("quick-reference.md");
+        if quick_ref_path.exists() {
+            let quick_ref_content = fs::read_to_string(&quick_ref_path)?;
+            combined_prompt.push_str("\n\n### Quick Reference\n\n");
+            combined_prompt.push_str(&quick_ref_content);
+        }
+
+        self.prompts.insert("generate-trap".to_string(), combined_prompt);
+        info!("Loaded trap generation prompt");
+        
+        Ok(())
+    }
+
+    fn load_index(&mut self) -> Result<()> {
+        let index_path = Path::new("src/data/index.json");
+        
+        if index_path.exists() {
+            let content = fs::read_to_string(index_path)?;
+            let index_data: Value = serde_json::from_str(&content)?;
+            self.index = Some(index_data);
+            info!("Loaded context index");
+        } else {
+            info!("Context index not found");
         }
         
         Ok(())
@@ -347,6 +427,16 @@ impl DroseraServer {
                         "uri": format!("trap-example://{}", example_name),
                         "name": format!("{} Trap Example", example_name.replace('-', " ").chars().collect::<String>()),
                         "description": format!("Complete trap example: {}", example_name),
+                        "mimeType": "application/json"
+                    }));
+                }
+
+                // Add context index resource
+                if self.index.is_some() {
+                    resources.push(json!({
+                        "uri": "index://context",
+                        "name": "Context Index",
+                        "description": "Cross-reference index for all protocols, examples, and documentation",
                         "mimeType": "application/json"
                     }));
                 }
@@ -500,6 +590,39 @@ impl DroseraServer {
                             }
                         }));
                     }
+                } else if uri.starts_with("index://") {
+                    if uri == "index://context" {
+                        if let Some(index_data) = &self.index {
+                            return Ok(json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "result": {
+                                    "contents": [{
+                                        "type": "text",
+                                        "text": serde_json::to_string_pretty(&index_data)?
+                                    }]
+                                }
+                            }));
+                        } else {
+                            return Ok(json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "error": {
+                                    "code": -32602,
+                                    "message": "Context index not available"
+                                }
+                            }));
+                        }
+                    } else {
+                        return Ok(json!({
+                            "jsonrpc": "2.0",
+                            "id": id,
+                            "error": {
+                                "code": -32602,
+                                "message": format!("Unknown index URI: {}", uri)
+                            }
+                        }));
+                    }
                 } else {
                     Ok(json!({
                         "jsonrpc": "2.0",
@@ -516,9 +639,71 @@ impl DroseraServer {
                     "jsonrpc": "2.0",
                     "id": id,
                     "result": {
-                        "prompts": []
+                        "prompts": [
+                            {
+                                "name": "generate-trap",
+                                "description": "Generate a Drosera Trap based on monitoring requirements. Includes comprehensive guidance on trap patterns, testing, and best practices.",
+                                "arguments": [
+                                    {
+                                        "name": "monitoring_type",
+                                        "description": "Type of monitoring scenario (e.g., oracle, liquidity, fee, access-control, bridge)",
+                                        "required": false
+                                    },
+                                    {
+                                        "name": "protocol",
+                                        "description": "Specific protocol to monitor (e.g., Aave, Uniswap, Compound)",
+                                        "required": false
+                                    }
+                                ]
+                            }
+                        ]
                     }
                 }))
+            }
+            "prompts/get" => {
+                let prompt_name = request["params"]["name"].as_str().unwrap_or("");
+                
+                match prompt_name {
+                    "generate-trap" => {
+                        if let Some(prompt_content) = self.prompts.get("generate-trap") {
+                            Ok(json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "result": {
+                                    "description": "Generate a Drosera Trap based on monitoring requirements",
+                                    "messages": [
+                                        {
+                                            "role": "system",
+                                            "content": {
+                                                "type": "text",
+                                                "text": prompt_content
+                                            }
+                                        }
+                                    ]
+                                }
+                            }))
+                        } else {
+                            Ok(json!({
+                                "jsonrpc": "2.0",
+                                "id": id,
+                                "error": {
+                                    "code": -32603,
+                                    "message": "Prompt content not loaded"
+                                }
+                            }))
+                        }
+                    }
+                    _ => {
+                        Ok(json!({
+                            "jsonrpc": "2.0",
+                            "id": id,
+                            "error": {
+                                "code": -32602,
+                                "message": format!("Unknown prompt: {}", prompt_name)
+                            }
+                        }))
+                    }
+                }
             }
             _ => {
                 Ok(json!({

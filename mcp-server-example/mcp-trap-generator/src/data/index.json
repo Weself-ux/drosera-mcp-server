@@ -1,0 +1,207 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Drosera Trap Generator Context Index",
+    "last_updated": "2024-01-01"
+  },
+  "protocols": {
+    "uniswap": {
+      "name": "Uniswap",
+      "description": "Decentralized exchange with automated market making",
+      "networks": ["mainnet"],
+      "supported_trap_types": [
+        "price_oracle_trap",
+        "liquidation_trap",
+        "yield_harvest_trap"
+      ],
+      "related_examples": [
+        "liquidity-pool-health-trap",
+        "fee-change-trap",
+        "twap"
+      ],
+      "related_docs": [
+        "operators/executing-traps",
+        "trappers/creating-a-trap",
+        "general/use-cases"
+      ]
+    }
+  },
+  "trap_examples": {
+    "defi-automation": {
+      "aave-liquidation-trap": {
+        "category": "liquidation_trap",
+        "protocols": ["aave"],
+        "difficulty": "intermediate",
+        "description": "Monitor Aave positions for liquidation opportunities",
+        "related_docs": [
+          "operators/executing-traps",
+          "trappers/creating-a-trap"
+        ],
+        "related_protocols": ["aave"]
+      },
+      "liquidity-pool-health-trap": {
+        "category": "liquidity_trap",
+        "protocols": ["uniswap"],
+        "difficulty": "beginner",
+        "description": "Monitor Uniswap pool liquidity and health",
+        "related_docs": [
+          "operators/executing-traps",
+          "trappers/creating-a-trap"
+        ],
+        "related_protocols": ["uniswap"]
+      },
+      "fee-change-trap": {
+        "category": "yield_harvest_trap",
+        "protocols": ["uniswap"],
+        "difficulty": "beginner",
+        "description": "Monitor for fee changes in protocols",
+        "related_docs": [
+          "operators/executing-traps",
+          "trappers/creating-a-trap"
+        ],
+        "related_protocols": ["uniswap"]
+      },
+      "stale-oracle-trap": {
+        "category": "price_oracle_trap",
+        "protocols": ["uniswap"],
+        "difficulty": "intermediate",
+        "description": "Detect stale oracle data",
+        "related_docs": [
+          "operators/executing-traps",
+          "trappers/creating-a-trap"
+        ],
+        "related_protocols": ["uniswap"]
+      },
+      "twap": {
+        "category": "price_oracle_trap",
+        "protocols": ["uniswap"],
+        "difficulty": "advanced",
+        "description": "Time-weighted average price monitoring",
+        "related_docs": [
+          "operators/executing-traps",
+          "trappers/creating-a-trap"
+        ],
+        "related_protocols": ["uniswap"]
+      }
+    },
+    "historical-exploits": {
+      "euler": {
+        "category": "historical_exploit",
+        "protocols": ["euler"],
+        "difficulty": "advanced",
+        "description": "Euler Finance exploit analysis",
+        "related_docs": [
+          "operators/executing-traps",
+          "trappers/creating-a-trap"
+        ],
+        "related_protocols": ["euler"]
+      }
+    }
+  },
+  "documentation": {
+    "operators": {
+      "executing-traps": {
+        "title": "Executing Traps",
+        "description": "How operators execute traps and handle responses",
+        "related_examples": [
+          "liquidity-pool-health-trap",
+          "aave-liquidation-trap"
+        ],
+        "related_protocols": ["uniswap", "aave"]
+      },
+      "installation": {
+        "title": "Operator Installation",
+        "description": "How to install and set up Drosera operators",
+        "related_examples": [
+          "liquidity-pool-health-trap",
+          "aave-liquidation-trap"
+        ],
+        "related_protocols": ["uniswap", "aave"]
+      },
+      "run-operator": {
+        "title": "Running Operators",
+        "description": "How to run and manage Drosera operators",
+        "related_examples": [
+          "liquidity-pool-health-trap",
+          "aave-liquidation-trap"
+        ],
+        "related_protocols": ["uniswap", "aave"]
+      }
+    },
+    "trappers": {
+      "creating-a-trap": {
+        "title": "Creating a Trap",
+        "description": "Guide for creating new Drosera traps",
+        "related_examples": [
+          "liquidity-pool-health-trap",
+          "aave-liquidation-trap"
+        ],
+        "related_protocols": ["uniswap", "aave"]
+      },
+      "getting-started": {
+        "title": "Getting Started",
+        "description": "Getting started with Drosera trap development",
+        "related_examples": ["liquidity-pool-health-trap", "fee-change-trap"],
+        "related_protocols": ["uniswap"]
+      },
+      "drosera-cli": {
+        "title": "Drosera CLI",
+        "description": "Command line interface for Drosera trap management",
+        "related_examples": [
+          "liquidity-pool-health-trap",
+          "aave-liquidation-trap"
+        ],
+        "related_protocols": ["uniswap", "aave"]
+      }
+    },
+    "general": {
+      "introduction": {
+        "title": "Introduction to Drosera",
+        "description": "Overview of the Drosera protocol and ecosystem",
+        "related_examples": [
+          "liquidity-pool-health-trap",
+          "aave-liquidation-trap"
+        ],
+        "related_protocols": ["uniswap", "aave"]
+      },
+      "use-cases": {
+        "title": "Use Cases",
+        "description": "Common use cases and applications for Drosera traps",
+        "related_examples": [
+          "liquidity-pool-health-trap",
+          "aave-liquidation-trap",
+          "fee-change-trap"
+        ],
+        "related_protocols": ["uniswap", "aave"]
+      }
+    }
+  },
+  "common_patterns": {
+    "price_monitoring": {
+      "description": "Monitor price feeds and detect manipulation",
+      "key_components": ["oracle_contract", "price_threshold", "time_window"],
+      "example_traps": ["stale-oracle-trap", "twap"],
+      "related_docs": ["operators/executing-traps", "trappers/creating-a-trap"]
+    },
+    "liquidity_monitoring": {
+      "description": "Monitor pool liquidity and health",
+      "key_components": [
+        "pool_contract",
+        "liquidity_threshold",
+        "health_metrics"
+      ],
+      "example_traps": ["liquidity-pool-health-trap"],
+      "related_docs": ["operators/executing-traps", "trappers/creating-a-trap"]
+    },
+    "liquidation_monitoring": {
+      "description": "Monitor positions for liquidation opportunities",
+      "key_components": [
+        "lending_contract",
+        "health_factor",
+        "collateral_ratio"
+      ],
+      "example_traps": ["aave-liquidation-trap"],
+      "related_docs": ["operators/executing-traps", "trappers/creating-a-trap"]
+    }
+  }
+}

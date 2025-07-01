@@ -1,0 +1,17 @@
+ethereum_rpc = "https://geth.devnet.drosera.io"
+drosera_rpc = "https://relay.devnet.drosera.io"
+drosera_address = "0x7E1b5cA35bd6BcAe8Ff33C0dDf79EffCFf0Ad19e"
+
+[traps]
+
+[traps.multitokenbalance]
+path = "out/MultiTokenBalanceTrap.sol/MultiTokenBalanceTrap.json"
+response_contract = "0x0000000000000000000000000000000000000000" # placeholder - would be treasury management contract
+response_function = "refillTokenBalances((address,address,uint256,uint256)[])" # function to handle multiple token refills
+cooldown_period_blocks = 500 # prevent rapid refills - wait ~2 hours between refills
+min_number_of_operators = 2
+max_number_of_operators = 4
+block_sample_size = 10
+private_trap = false
+whitelist = []
+address = "0x0000000000000000000000000000000000000000" # placeholder - would be deployed trap address

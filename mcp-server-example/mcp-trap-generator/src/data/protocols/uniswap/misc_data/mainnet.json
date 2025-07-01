@@ -8,8 +8,48 @@
   "chainId": 1,
   "supported_trap_types": [
     "price_oracle_trap",
-    "liquidation_trap", 
+    "liquidation_trap",
     "yield_harvest_trap"
+  ],
+  "trap_categories": {
+    "price_oracle_trap": {
+      "description": "Monitor price feeds and oracle manipulation",
+      "common_targets": ["slot0", "sqrtPriceX96", "tick"],
+      "example_traps": ["stale-oracle-trap", "twap"]
+    },
+    "liquidation_trap": {
+      "description": "Monitor for liquidation opportunities",
+      "common_targets": ["healthFactor", "collateralRatio"],
+      "example_traps": ["aave-liquidation-trap"]
+    },
+    "yield_harvest_trap": {
+      "description": "Monitor yield farming opportunities",
+      "common_targets": ["rewards", "APY", "fees"],
+      "example_traps": ["fee-change-trap", "scheduler-trap"]
+    }
+  },
+  "common_monitoring_scenarios": [
+    {
+      "name": "price_manipulation",
+      "description": "Detect unusual price movements or oracle manipulation",
+      "target_contracts": ["factory", "popular_pools"],
+      "key_events": ["Swap"],
+      "key_functions": ["slot0", "getPool"]
+    },
+    {
+      "name": "liquidity_health",
+      "description": "Monitor pool liquidity and health metrics",
+      "target_contracts": ["popular_pools"],
+      "key_events": ["Mint", "Burn", "Collect"],
+      "key_functions": ["liquidity", "tickSpacing"]
+    },
+    {
+      "name": "fee_optimization",
+      "description": "Monitor for optimal fee tier opportunities",
+      "target_contracts": ["factory", "popular_pools"],
+      "key_events": ["Swap"],
+      "key_functions": ["fee", "tickSpacing"]
+    }
   ],
   "imports": [
     "import {IERC20} from \"@openzeppelin/contracts/token/ERC20/IERC20.sol\";",
@@ -20,7 +60,7 @@
   ],
   "common_functions": [
     "exactInputSingle",
-    "exactOutputSingle", 
+    "exactOutputSingle",
     "mint",
     "burn",
     "collect",
@@ -39,7 +79,7 @@
       "abi": "IUniswapV3Factory"
     },
     "swapRouter": {
-      "address": "0xE592427A0AEce92De3Edee1F18E0157C05861564", 
+      "address": "0xE592427A0AEce92De3Edee1F18E0157C05861564",
       "abi": "ISwapRouter"
     },
     "swapRouter02": {
@@ -55,7 +95,7 @@
       "abi": "IQuoter"
     },
     "quoterV2": {
-      "address": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e", 
+      "address": "0x61fFE014bA17989E743c5F6cB21bF9697530B21e",
       "abi": "IQuoterV2"
     },
     "multicall": {
@@ -65,7 +105,7 @@
   },
   "tokens": {
     "WETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-    "USDC": "0xA0b86a33E6441A8A94b30d4b9ed6c7f1DE5a2C90", 
+    "USDC": "0xA0b86a33E6441A8A94b30d4b9ed6c7f1DE5a2C90",
     "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
     "DAI": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
     "WBTC": "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599"
@@ -76,7 +116,7 @@
       "abi": "IUniswapV3Pool",
       "token0": "0xA0b86a33E6441A8A94b30d4b9ed6c7f1DE5a2C90",
       "token0_symbol": "USDC",
-      "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", 
+      "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
       "token1_symbol": "WETH",
       "fee": 500,
       "description": "USDC/WETH 0.05% fee pool"
@@ -85,7 +125,7 @@
       "address": "0x8ad599c3A0ff1dE082011EFDDc58f1908eb6e6D8",
       "abi": "IUniswapV3Pool",
       "token0": "0xA0b86a33E6441A8A94b30d4b9ed6c7f1DE5a2C90",
-      "token0_symbol": "USDC", 
+      "token0_symbol": "USDC",
       "token1": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
       "token1_symbol": "WETH",
       "fee": 3000,
@@ -97,7 +137,7 @@
       "token0": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
       "token0_symbol": "DAI",
       "token1": "0xA0b86a33E6441A8A94b30d4b9ed6c7f1DE5a2C90",
-      "token1_symbol": "USDC", 
+      "token1_symbol": "USDC",
       "fee": 500,
       "description": "DAI/USDC 0.05% fee pool"
     },
