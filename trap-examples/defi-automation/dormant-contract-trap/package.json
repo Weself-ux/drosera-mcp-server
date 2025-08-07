@@ -1,0 +1,37 @@
+{
+  "name": "dormant-contract-reactivation-trap",
+  "version": "1.0.0",
+  "description": "Drosera trap for monitoring dormant contract reactivations with Telegram alerts",
+  "main": "scripts/monitor.js",
+  "scripts": {
+    "start": "node scripts/monitor.js",
+    "test": "node scripts/test.js"
+  },
+  "keywords": [
+    "drosera",
+    "trap",
+    "smart-contract",
+    "monitoring",
+    "security",
+    "telegram",
+    "blockchain",
+    "defi"
+  ],
+  "author": "Ayanfe (Drosera Community)",
+  "license": "MIT",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.66.0",
+    "web3": "^4.15.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/drosera-network/drosera-mcp-server"
+  },
+  "bugs": {
+    "url": "https://github.com/drosera-network/drosera-mcp-server/issues"
+  },
+  "homepage": "https://github.com/Weself-ux/drosera-mcp-server/new/main/trap-examples/defi-automation/dormant-contract-trap"
+}
