@@ -113,7 +113,7 @@ When a dormant contract reactivates, you'll receive:
 ## Future Enhancements
 
 - Automatic contract discovery based on activity patterns
-- Integration with multiple notification channels (Discord, Slack)
+- Integration with multiple notification channels eg. (Discord)
 - Advanced pattern recognition for suspicious reactivation behaviors
 - Multi-chain monitoring support
 - Integration with other Drosera traps for comprehensive security coverage
