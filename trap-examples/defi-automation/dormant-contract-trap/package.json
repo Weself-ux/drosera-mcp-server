@@ -1,37 +1,26 @@
 {
-  "name": "dormant-contract-reactivation-trap",
+  "name": "@trap-examples/defi-automation/dormant-contract-monitor",
   "version": "1.0.0",
-  "description": "Drosera trap for monitoring dormant contract reactivations with Telegram alerts",
-  "main": "scripts/monitor.js",
+  "description": "Drosera trap for monitoring dormant contracts from rug pulls and failed projects",
+  "main": "monitor.js",
   "scripts": {
-    "start": "node scripts/monitor.js",
-    "test": "node scripts/test.js"
+    "start": "node monitor.js",
+    "test": "forge test",
+    "build": "forge build",
+    "deploy": "drosera deploy --config drosera.toml"
   },
-  "keywords": [
-    "drosera",
-    "trap",
-    "smart-contract",
-    "monitoring",
-    "security",
-    "telegram",
-    "blockchain",
-    "defi"
-  ],
-  "author": "Ayanfe (Drosera Community)",
+  "keywords": ["drosera", "trap", "security", "rug-pull", "monitoring", "defi"],
+  "author": "YourName",
   "license": "MIT",
+  "devDependencies": {
+    "forge-std": "github:foundry-rs/forge-std#v1.8.1"
+  },
   "dependencies": {
-    "node-telegram-bot-api": "^0.66.0",
-    "web3": "^4.15.0"
+    "contracts": "https://github.com/drosera-network/contracts",
+    "node-telegram-bot-api": "^0.64.0",
+    "web3": "^4.2.2"
   },
   "engines": {
     "node": ">=16.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/drosera-network/drosera-mcp-server"
-  },
-  "bugs": {
-    "url": "https://github.com/drosera-network/drosera-mcp-server/issues"
-  },
-  "homepage": "https://github.com/Weself-ux/drosera-mcp-server/new/main/trap-examples/defi-automation/dormant-contract-trap"
+  }
 }
