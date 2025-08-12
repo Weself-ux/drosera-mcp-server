@@ -1,45 +1,77 @@
-/ SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import {ITrap} from "contracts/interfaces/ITrap.sol";
 
 /**
- * @title DormantContractMonitor
- * @dev Monitors dormant contracts and alerts when they become active
- * @dev Compatible with Drosera network trap system
+ * @title DormantContractTrap
+ * @notice Monitor dormant/abandoned smart contracts and detect when they become active
+ * @dev Drosera trap that monitors contracts from rug pulls or failed projects
  */
-contract DormantContractMonitor {
-    struct ContractInfo {
+contract DormantContractTrap is ITrap {
+    
+    uint256 constant DORMANCY_PERIOD = 90 days; // Consider dormant after 90 days
+    uint256 constant ACTIVITY_THRESHOLD = 0.001 ether; // Minimum balance change to consider active
+    
+    struct ContractActivity {
         address contractAddress;
-        bool isActive;
+        uint256 lastBalance;
         uint256 lastActivityTime;
-        uint256 addedTime;
+        uint256 blockNumber;
+        bool wasActive;
     }
     
-    ContractInfo[] public monitoredContracts;
-    mapping(address => uint256) public contractToIndex;
+    struct ActivationAlert {
+        address contractAddress;
+        uint256 previousBalance;
+        uint256 currentBalance;
+        uint256 dormantSince;
+        uint256 reactivatedAt;
+    }
+    
+    struct TelegramConfig {
+        string botToken;
+        string chatId;
+        address operatorAddress;
+        bool enabled;
+    }
+    
+    address[] public monitoredContracts;
+    mapping(address => uint256) public lastKnownBalance;
+    mapping(address => uint256) public lastActivityTimestamp;
     mapping(address => bool) public isMonitored;
     
+    TelegramConfig public telegramConfig;
     address public owner;
-    uint256 public inactivityPeriod;
     
     // Events
-    event ContractActivated(address indexed contractAddress, uint256 timestamp);
+    event DormantContractReactivated(
+        address indexed contractAddress, 
+        uint256 previousBalance,
+        uint256 currentBalance,
+        uint256 dormantSince,
+        uint256 timestamp
+    );
     event ContractAdded(address indexed contractAddress);
-    event ContractStatusUpdated(address indexed contractAddress, bool isActive);
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-    event InactivityPeriodUpdated(uint256 oldPeriod, uint256 newPeriod);
+    event ContractRemoved(address indexed contractAddress);
+    event TelegramConfigured(address indexed operatorAddress, string chatId);
+    event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
     
     // Errors
     error NotOwner();
     error InvalidAddress();
     error ContractAlreadyMonitored();
     error ContractNotMonitored();
-    error InvalidInactivityPeriod();
-    error UnauthorizedAccess();
+    error InvalidTelegramConfig();
+    error UnauthorizedOperator();
     
-    constructor(uint256 _inactivityPeriod) {
-        if (_inactivityPeriod == 0) revert InvalidInactivityPeriod();
+    constructor() {
         owner = msg.sender;
-        inactivityPeriod = _inactivityPeriod;
+        
+        // Add some example contracts to monitor (replace with actual addresses)
+        _addContractToMonitor(0x0000000000000000000000000000000000000000);
+        _addContractToMonitor(0x0000000000000000000000000000000000000000);
+        _addContractToMonitor(0x0000000000000000000000000000000000000000);
     }
     
     modifier onlyOwner() {
@@ -47,228 +79,249 @@ contract DormantContractMonitor {
         _;
     }
     
-    modifier validAddress(address _address) {
-        if (_address == address(0)) revert InvalidAddress();
+    modifier onlyAuthorizedOperator() {
+        if (telegramConfig.enabled && msg.sender != telegramConfig.operatorAddress) {
+            revert UnauthorizedOperator();
+        }
         _;
     }
     
     /**
-     * @dev Adds a contract to monitoring list
-     * @param _contractAddress Address of contract to monitor
+     * @dev ITrap implementation - collect data about monitored contracts
      */
-    function addContractToMonitor(address _contractAddress) 
+    function collect() external view override returns (bytes memory) {
+        ContractActivity[] memory activities = new ContractActivity[](monitoredContracts.length);
+        
+        for (uint256 i = 0; i < monitoredContracts.length; i++) {
+            address contractAddr = monitoredContracts[i];
+            uint256 currentBalance = contractAddr.balance;
+            
+            activities[i] = ContractActivity({
+                contractAddress: contractAddr,
+                lastBalance: lastKnownBalance[contractAddr],
+                lastActivityTime: lastActivityTimestamp[contractAddr],
+                blockNumber: block.number,
+                wasActive: currentBalance != lastKnownBalance[contractAddr]
+            });
+        }
+        
+        return abi.encode(activities);
+    }
+    
+    /**
+     * @dev ITrap implementation - determine if trap should respond
+     */
+    function shouldRespond(bytes[] calldata data) 
         external 
-        onlyOwner 
-        validAddress(_contractAddress) 
+        override 
+        returns (bool shouldTrigger, bytes memory responseData) 
     {
+        if (data.length == 0) {
+            return (false, "");
+        }
+        
+        ContractActivity[] memory activities = abi.decode(data[0], (ContractActivity[]));
+        
+        ActivationAlert[] memory alerts = new ActivationAlert[](activities.length);
+        uint256 alertCount = 0;
+        
+        for (uint256 i = 0; i < activities.length; i++) {
+            ContractActivity memory activity = activities[i];
+            
+            // Check if contract was dormant and is now showing activity
+            bool isDormant = _isDormant(activity.contractAddress);
+            bool hasActivity = _hasSignificantActivity(activity);
+            
+            if (isDormant && hasActivity) {
+                alerts[alertCount++] = ActivationAlert({
+                    contractAddress: activity.contractAddress,
+                    previousBalance: activity.lastBalance,
+                    currentBalance: activity.contractAddress.balance,
+                    dormantSince: lastActivityTimestamp[activity.contractAddress],
+                    reactivatedAt: block.timestamp
+                });
+                
+                // Update internal state
+                lastKnownBalance[activity.contractAddress] = activity.contractAddress.balance;
+                lastActivityTimestamp[activity.contractAddress] = block.timestamp;
+                
+                // Emit event for monitor.js to pick up
+                emit DormantContractReactivated(
+                    activity.contractAddress,
+                    activity.lastBalance,
+                    activity.contractAddress.balance,
+                    lastActivityTimestamp[activity.contractAddress],
+                    block.timestamp
+                );
+            }
+        }
+        
+        if (alertCount > 0) {
+            ActivationAlert[] memory result = new ActivationAlert[](alertCount);
+            for (uint256 i = 0; i < alertCount; i++) {
+                result[i] = alerts[i];
+            }
+            return (true, abi.encode(result));
+        }
+        
+        return (false, "");
+    }
+    
+    /**
+     * @dev Configure Telegram bot integration
+     */
+    function configureTelegram(
+        string calldata _botToken,
+        string calldata _chatId,
+        address _operatorAddress
+    ) external onlyOwner {
+        if (_operatorAddress == address(0)) revert InvalidAddress();
+        if (bytes(_botToken).length == 0 || bytes(_chatId).length == 0) {
+            revert InvalidTelegramConfig();
+        }
+        
+        telegramConfig = TelegramConfig({
+            botToken: _botToken,
+            chatId: _chatId,
+            operatorAddress: _operatorAddress,
+            enabled: true
+        });
+        
+        emit TelegramConfigured(_operatorAddress, _chatId);
+    }
+    
+    /**
+     * @dev Add contract to monitoring list
+     */
+    function addContractToMonitor(address _contractAddress) external onlyOwner {
+        _addContractToMonitor(_contractAddress);
+    }
+    
+    /**
+     * @dev Internal function to add contract
+     */
+    function _addContractToMonitor(address _contractAddress) internal {
+        if (_contractAddress == address(0)) revert InvalidAddress();
         if (isMonitored[_contractAddress]) revert ContractAlreadyMonitored();
         
-        contractToIndex[_contractAddress] = monitoredContracts.length;
         isMonitored[_contractAddress] = true;
-        
-        monitoredContracts.push(ContractInfo({
-            contractAddress: _contractAddress,
-            isActive: false,
-            lastActivityTime: block.timestamp,
-            addedTime: block.timestamp
-        }));
+        monitoredContracts.push(_contractAddress);
+        lastKnownBalance[_contractAddress] = _contractAddress.balance;
+        lastActivityTimestamp[_contractAddress] = block.timestamp;
         
         emit ContractAdded(_contractAddress);
     }
     
     /**
-     * @dev Updates last activity time for a contract
-     * @param _contractAddress Contract to update
+     * @dev Remove contract from monitoring
      */
-    function updateLastActivityTime(address _contractAddress) external {
+    function removeContractFromMonitoring(address _contractAddress) external onlyOwner {
         if (!isMonitored[_contractAddress]) revert ContractNotMonitored();
         
-        uint256 index = contractToIndex[_contractAddress];
-        monitoredContracts[index].lastActivityTime = block.timestamp;
-    }
-    
-    /**
-     * @dev Checks and updates contract activity status
-     * @param _contractAddress Contract to check
-     * @param _isActive Current activity status
-     */
-    function checkContractActivity(address _contractAddress, bool _isActive) external {
-        if (!isMonitored[_contractAddress]) revert ContractNotMonitored();
-        
-        uint256 index = contractToIndex[_contractAddress];
-        ContractInfo storage contractInfo = monitoredContracts[index];
-        
-        // If contract was active and now inactive
-        if (!_isActive && contractInfo.isActive) {
-            contractInfo.isActive = false;
-            contractInfo.lastActivityTime = block.timestamp;
-            emit ContractStatusUpdated(_contractAddress, false);
-        }
-        // If contract was inactive and now active
-        else if (_isActive && !contractInfo.isActive) {
-            // Check if it's been inactive long enough to be considered "dormant"
-            if (block.timestamp - contractInfo.lastActivityTime >= inactivityPeriod) {
-                contractInfo.isActive = true;
-                contractInfo.lastActivityTime = block.timestamp;
-                emit ContractActivated(_contractAddress, block.timestamp);
+        // Find and remove from array
+        for (uint256 i = 0; i < monitoredContracts.length; i++) {
+            if (monitoredContracts[i] == _contractAddress) {
+                monitoredContracts[i] = monitoredContracts[monitoredContracts.length - 1];
+                monitoredContracts.pop();
+                break;
             }
         }
         
-        emit ContractStatusUpdated(_contractAddress, _isActive);
+        delete isMonitored[_contractAddress];
+        delete lastKnownBalance[_contractAddress];
+        delete lastActivityTimestamp[_contractAddress];
+        
+        emit ContractRemoved(_contractAddress);
     }
     
     /**
-     * @dev Checks if a contract is dormant
-     * @param _contractAddress Contract to check
-     * @return bool True if contract is dormant
+     * @dev Check if contract is dormant
      */
-    function isDormant(address _contractAddress) public view returns (bool) {
+    function _isDormant(address _contractAddress) internal view returns (bool) {
         if (!isMonitored[_contractAddress]) return false;
-        
-        uint256 index = contractToIndex[_contractAddress];
-        ContractInfo memory contractInfo = monitoredContracts[index];
-        
-        return (block.timestamp - contractInfo.lastActivityTime >= inactivityPeriod) && !contractInfo.isActive;
+        return (block.timestamp - lastActivityTimestamp[_contractAddress]) >= DORMANCY_PERIOD;
     }
     
     /**
-     * @dev Manually triggers activation check (for testing)
-     * @param _contractAddress Contract to check
+     * @dev Check if there's significant activity
      */
-    function manualActivationCheck(address _contractAddress) external onlyOwner {
-        if (!isMonitored[_contractAddress]) revert ContractNotMonitored();
-        
-        uint256 index = contractToIndex[_contractAddress];
-        ContractInfo storage contractInfo = monitoredContracts[index];
-        
-        if (isDormant(_contractAddress)) {
-            contractInfo.isActive = true;
-            contractInfo.lastActivityTime = block.timestamp;
-            emit ContractActivated(_contractAddress, block.timestamp);
-        }
+    function _hasSignificantActivity(ContractActivity memory _activity) internal pure returns (bool) {
+        uint256 currentBalance = _activity.contractAddress.balance;
+        uint256 balanceDiff = currentBalance > _activity.lastBalance 
+            ? currentBalance - _activity.lastBalance 
+            : _activity.lastBalance - currentBalance;
+            
+        return balanceDiff >= ACTIVITY_THRESHOLD || _activity.wasActive;
     }
     
     /**
-     * @dev Gets contract monitoring information
-     * @param _contractAddress Contract to query
-     * @return contractAddress The contract address
-     * @return isActive Current activity status
-     * @return lastActivityTime Last recorded activity timestamp
-     * @return addedTime When contract was added to monitoring
-     * @return dormant Current dormancy status
+     * @dev Get list of monitored contracts
+     */
+    function getMonitoredContracts() external view returns (address[] memory) {
+        return monitoredContracts;
+    }
+    
+    /**
+     * @dev Get contract info
      */
     function getContractInfo(address _contractAddress) external view returns (
-        address contractAddress,
-        bool isActive,
-        uint256 lastActivityTime,
-        uint256 addedTime,
-        bool dormant
+        uint256 lastBalance,
+        uint256 lastActivity,
+        bool dormant,
+        bool monitored
     ) {
-        if (!isMonitored[_contractAddress]) revert ContractNotMonitored();
-        
-        uint256 index = contractToIndex[_contractAddress];
-        ContractInfo memory info = monitoredContracts[index];
-        
         return (
-            info.contractAddress,
-            info.isActive,
-            info.lastActivityTime,
-            info.addedTime,
-            isDormant(_contractAddress)
+            lastKnownBalance[_contractAddress],
+            lastActivityTimestamp[_contractAddress],
+            _isDormant(_contractAddress),
+            isMonitored[_contractAddress]
         );
     }
     
     /**
-     * @dev Gets total number of monitored contracts
-     * @return uint256 Count of monitored contracts
+     * @dev Get Telegram config
+     */
+    function getTelegramConfig() external view returns (TelegramConfig memory) {
+        return telegramConfig;
+    }
+    
+    /**
+     * @dev Get dormancy period
+     */
+    function getDormancyPeriod() external pure returns (uint256) {
+        return DORMANCY_PERIOD;
+    }
+    
+    /**
+     * @dev Get activity threshold
+     */
+    function getActivityThreshold() external pure returns (uint256) {
+        return ACTIVITY_THRESHOLD;
+    }
+    
+    /**
+     * @dev Get monitored contracts count
      */
     function getMonitoredContractsCount() external view returns (uint256) {
         return monitoredContracts.length;
     }
     
     /**
-     * @dev Updates the inactivity period
-     * @param _newPeriod New inactivity period in seconds
+     * @dev Transfer ownership
      */
-    function updateInactivityPeriod(uint256 _newPeriod) external onlyOwner {
-        if (_newPeriod == 0) revert InvalidInactivityPeriod();
+    function transferOwnership(address _newOwner) external onlyOwner {
+        if (_newOwner == address(0)) revert InvalidAddress();
         
-        uint256 oldPeriod = inactivityPeriod;
-        inactivityPeriod = _newPeriod;
-        
-        emit InactivityPeriodUpdated(oldPeriod, _newPeriod);
-    }
-    
-    /**
-     * @dev Transfers ownership to a new address
-     * @param _newOwner Address of the new owner
-     */
-    function transferOwnership(address _newOwner) external onlyOwner validAddress(_newOwner) {
         address oldOwner = owner;
         owner = _newOwner;
+        
         emit OwnershipTransferred(oldOwner, _newOwner);
     }
     
     /**
-     * @dev DROSERA REQUIRED: Response function called when trap is triggered
-     * @param _contractAddress Contract that triggered the trap
+     * @dev Enable/disable Telegram
      */
-    function response(address _contractAddress) external {
-        if (!isMonitored[_contractAddress]) revert ContractNotMonitored();
-        
-        uint256 index = contractToIndex[_contractAddress];
-        ContractInfo storage contractInfo = monitoredContracts[index];
-        
-        // Mark as active and update timestamp
-        contractInfo.isActive = true;
-        contractInfo.lastActivityTime = block.timestamp;
-        
-        // Emit the activation event for monitoring systems
-        emit ContractActivated(_contractAddress, block.timestamp);
-        
-        // Additional response logic can be added here:
-        // - Pause related contracts
-        // - Trigger emergency procedures
-        // - Alert other systems
-        // - etc.
-    }
-    
-    /**
-     * @dev DROSERA REQUIRED: Check if trap should be triggered
-     * @param _contractAddress Contract to check
-     * @return bool True if trap should trigger
-     */
-    function shouldTrigger(address _contractAddress) external view returns (bool) {
-        if (!isMonitored[_contractAddress]) return false;
-        
-        uint256 index = contractToIndex[_contractAddress];
-        ContractInfo memory contractInfo = monitoredContracts[index];
-        
-        // Trigger if contract has been dormant and is now showing activity
-        return isDormant(_contractAddress) && contractInfo.isActive;
-    }
-    
-    /**
-     * @dev Removes a contract from monitoring (emergency function)
-     * @param _contractAddress Contract to remove
-     */
-    function removeContractFromMonitoring(address _contractAddress) external onlyOwner {
-        if (!isMonitored[_contractAddress]) revert ContractNotMonitored();
-        
-        uint256 index = contractToIndex[_contractAddress];
-        uint256 lastIndex = monitoredContracts.length - 1;
-        
-        // Move the last element to the deleted spot
-        if (index != lastIndex) {
-            ContractInfo storage lastContract = monitoredContracts[lastIndex];
-            monitoredContracts[index] = lastContract;
-            contractToIndex[lastContract.contractAddress] = index;
-        }
-        
-        // Remove the last element
-        monitoredContracts.pop();
-        delete contractToIndex[_contractAddress];
-        delete isMonitored[_contractAddress];
+    function setTelegramEnabled(bool _enabled) external onlyOwner {
+        telegramConfig.enabled = _enabled;
     }
 }
-
