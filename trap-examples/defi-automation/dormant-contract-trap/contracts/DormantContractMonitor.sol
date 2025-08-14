@@ -1,327 +1,185 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
-
-import {ITrap} from "contracts/interfaces/ITrap.sol";
+pragma solidity ^0.8.20;
 
 /**
- * @title DormantContractTrap
- * @notice Monitor dormant/abandoned smart contracts and detect when they become active
- * @dev Drosera trap that monitors contracts from rug pulls or failed projects
+ * @title DormantResponseContract
+ * @notice Handles responses when dormant contracts are reactivated
+ * @dev This contract is called by Drosera when the DormantContractTrap triggers
  */
-contract DormantContractTrap is ITrap {
+contract DormantResponseContract {
     
-    uint256 constant DORMANCY_PERIOD = 90 days; // Consider dormant after 90 days
-    uint256 constant ACTIVITY_THRESHOLD = 0.001 ether; // Minimum balance change to consider active
-    
-    struct ContractActivity {
+    struct ReactivationRecord {
         address contractAddress;
-        uint256 lastBalance;
-        uint256 lastActivityTime;
+        uint256 timestamp;
         uint256 blockNumber;
-        bool wasActive;
+        bool handled;
     }
     
-    struct ActivationAlert {
-        address contractAddress;
-        uint256 previousBalance;
-        uint256 currentBalance;
-        uint256 dormantSince;
-        uint256 reactivatedAt;
-    }
-    
-    struct TelegramConfig {
-        string botToken;
-        string chatId;
-        address operatorAddress;
-        bool enabled;
-    }
-    
-    address[] public monitoredContracts;
-    mapping(address => uint256) public lastKnownBalance;
-    mapping(address => uint256) public lastActivityTimestamp;
-    mapping(address => bool) public isMonitored;
-    
-    TelegramConfig public telegramConfig;
     address public owner;
+    mapping(address => ReactivationRecord) public reactivations;
+    address[] public reactivatedContracts;
     
     // Events
     event DormantContractReactivated(
         address indexed contractAddress, 
-        uint256 previousBalance,
-        uint256 currentBalance,
-        uint256 dormantSince,
-        uint256 timestamp
+        uint256 timestamp, 
+        uint256 blockNumber
     );
-    event ContractAdded(address indexed contractAddress);
-    event ContractRemoved(address indexed contractAddress);
-    event TelegramConfigured(address indexed operatorAddress, string chatId);
-    event OwnershipTransferred(address indexed oldOwner, address indexed newOwner);
+    event ContractBlacklisted(address indexed contractAddress);
+    event EmergencyAlert(address indexed contractAddress, string message);
     
     // Errors
     error NotOwner();
     error InvalidAddress();
-    error ContractAlreadyMonitored();
-    error ContractNotMonitored();
-    error InvalidTelegramConfig();
-    error UnauthorizedOperator();
-    
-    constructor() {
-        owner = msg.sender;
-        
-        // Add some example contracts to monitor (replace with actual addresses)
-        _addContractToMonitor(0x0000000000000000000000000000000000000000);
-        _addContractToMonitor(0x0000000000000000000000000000000000000000);
-        _addContractToMonitor(0x0000000000000000000000000000000000000000);
-    }
+    error AlreadyHandled();
     
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
         _;
     }
     
-    modifier onlyAuthorizedOperator() {
-        if (telegramConfig.enabled && msg.sender != telegramConfig.operatorAddress) {
-            revert UnauthorizedOperator();
-        }
-        _;
+    constructor() {
+        owner = msg.sender;
     }
     
     /**
-     * @dev ITrap implementation - collect data about monitored contracts
+     * @dev Main response function called by Drosera
+     * @param reactivatedContract Address of the contract that became active
      */
-    function collect() external view override returns (bytes memory) {
-        ContractActivity[] memory activities = new ContractActivity[](monitoredContracts.length);
+    function handleDormantReactivation(address reactivatedContract) external {
+        if (reactivatedContract == address(0)) revert InvalidAddress();
         
-        for (uint256 i = 0; i < monitoredContracts.length; i++) {
-            address contractAddr = monitoredContracts[i];
-            uint256 currentBalance = contractAddr.balance;
-            
-            activities[i] = ContractActivity({
-                contractAddress: contractAddr,
-                lastBalance: lastKnownBalance[contractAddr],
-                lastActivityTime: lastActivityTimestamp[contractAddr],
-                blockNumber: block.number,
-                wasActive: currentBalance != lastKnownBalance[contractAddr]
-            });
-        }
+        // Check if already handled to prevent spam
+        if (reactivations[reactivatedContract].handled) revert AlreadyHandled();
         
-        return abi.encode(activities);
-    }
-    
-    /**
-     * @dev ITrap implementation - determine if trap should respond
-     */
-    function shouldRespond(bytes[] calldata data) 
-        external 
-        override 
-        returns (bool shouldTrigger, bytes memory responseData) 
-    {
-        if (data.length == 0) {
-            return (false, "");
-        }
-        
-        ContractActivity[] memory activities = abi.decode(data[0], (ContractActivity[]));
-        
-        ActivationAlert[] memory alerts = new ActivationAlert[](activities.length);
-        uint256 alertCount = 0;
-        
-        for (uint256 i = 0; i < activities.length; i++) {
-            ContractActivity memory activity = activities[i];
-            
-            // Check if contract was dormant and is now showing activity
-            bool isDormant = _isDormant(activity.contractAddress);
-            bool hasActivity = _hasSignificantActivity(activity);
-            
-            if (isDormant && hasActivity) {
-                alerts[alertCount++] = ActivationAlert({
-                    contractAddress: activity.contractAddress,
-                    previousBalance: activity.lastBalance,
-                    currentBalance: activity.contractAddress.balance,
-                    dormantSince: lastActivityTimestamp[activity.contractAddress],
-                    reactivatedAt: block.timestamp
-                });
-                
-                // Update internal state
-                lastKnownBalance[activity.contractAddress] = activity.contractAddress.balance;
-                lastActivityTimestamp[activity.contractAddress] = block.timestamp;
-                
-                // Emit event for monitor.js to pick up
-                emit DormantContractReactivated(
-                    activity.contractAddress,
-                    activity.lastBalance,
-                    activity.contractAddress.balance,
-                    lastActivityTimestamp[activity.contractAddress],
-                    block.timestamp
-                );
-            }
-        }
-        
-        if (alertCount > 0) {
-            ActivationAlert[] memory result = new ActivationAlert[](alertCount);
-            for (uint256 i = 0; i < alertCount; i++) {
-                result[i] = alerts[i];
-            }
-            return (true, abi.encode(result));
-        }
-        
-        return (false, "");
-    }
-    
-    /**
-     * @dev Configure Telegram bot integration
-     */
-    function configureTelegram(
-        string calldata _botToken,
-        string calldata _chatId,
-        address _operatorAddress
-    ) external onlyOwner {
-        if (_operatorAddress == address(0)) revert InvalidAddress();
-        if (bytes(_botToken).length == 0 || bytes(_chatId).length == 0) {
-            revert InvalidTelegramConfig();
-        }
-        
-        telegramConfig = TelegramConfig({
-            botToken: _botToken,
-            chatId: _chatId,
-            operatorAddress: _operatorAddress,
-            enabled: true
+        // Record the reactivation
+        reactivations[reactivatedContract] = ReactivationRecord({
+            contractAddress: reactivatedContract,
+            timestamp: block.timestamp,
+            blockNumber: block.number,
+            handled: true
         });
         
-        emit TelegramConfigured(_operatorAddress, _chatId);
-    }
-    
-    /**
-     * @dev Add contract to monitoring list
-     */
-    function addContractToMonitor(address _contractAddress) external onlyOwner {
-        _addContractToMonitor(_contractAddress);
-    }
-    
-    /**
-     * @dev Internal function to add contract
-     */
-    function _addContractToMonitor(address _contractAddress) internal {
-        if (_contractAddress == address(0)) revert InvalidAddress();
-        if (isMonitored[_contractAddress]) revert ContractAlreadyMonitored();
-        
-        isMonitored[_contractAddress] = true;
-        monitoredContracts.push(_contractAddress);
-        lastKnownBalance[_contractAddress] = _contractAddress.balance;
-        lastActivityTimestamp[_contractAddress] = block.timestamp;
-        
-        emit ContractAdded(_contractAddress);
-    }
-    
-    /**
-     * @dev Remove contract from monitoring
-     */
-    function removeContractFromMonitoring(address _contractAddress) external onlyOwner {
-        if (!isMonitored[_contractAddress]) revert ContractNotMonitored();
-        
-        // Find and remove from array
-        for (uint256 i = 0; i < monitoredContracts.length; i++) {
-            if (monitoredContracts[i] == _contractAddress) {
-                monitoredContracts[i] = monitoredContracts[monitoredContracts.length - 1];
-                monitoredContracts.pop();
+        // Add to list if not already there
+        bool exists = false;
+        for (uint256 i = 0; i < reactivatedContracts.length; i++) {
+            if (reactivatedContracts[i] == reactivatedContract) {
+                exists = true;
                 break;
             }
         }
         
-        delete isMonitored[_contractAddress];
-        delete lastKnownBalance[_contractAddress];
-        delete lastActivityTimestamp[_contractAddress];
+        if (!exists) {
+            reactivatedContracts.push(reactivatedContract);
+        }
         
-        emit ContractRemoved(_contractAddress);
-    }
-    
-    /**
-     * @dev Check if contract is dormant
-     */
-    function _isDormant(address _contractAddress) internal view returns (bool) {
-        if (!isMonitored[_contractAddress]) return false;
-        return (block.timestamp - lastActivityTimestamp[_contractAddress]) >= DORMANCY_PERIOD;
-    }
-    
-    /**
-     * @dev Check if there's significant activity
-     */
-    function _hasSignificantActivity(ContractActivity memory _activity) internal pure returns (bool) {
-        uint256 currentBalance = _activity.contractAddress.balance;
-        uint256 balanceDiff = currentBalance > _activity.lastBalance 
-            ? currentBalance - _activity.lastBalance 
-            : _activity.lastBalance - currentBalance;
-            
-        return balanceDiff >= ACTIVITY_THRESHOLD || _activity.wasActive;
-    }
-    
-    /**
-     * @dev Get list of monitored contracts
-     */
-    function getMonitoredContracts() external view returns (address[] memory) {
-        return monitoredContracts;
-    }
-    
-    /**
-     * @dev Get contract info
-     */
-    function getContractInfo(address _contractAddress) external view returns (
-        uint256 lastBalance,
-        uint256 lastActivity,
-        bool dormant,
-        bool monitored
-    ) {
-        return (
-            lastKnownBalance[_contractAddress],
-            lastActivityTimestamp[_contractAddress],
-            _isDormant(_contractAddress),
-            isMonitored[_contractAddress]
+        // Emit alert event
+        emit DormantContractReactivated(
+            reactivatedContract,
+            block.timestamp,
+            block.number
+        );
+        
+        // Emit emergency alert for immediate attention
+        emit EmergencyAlert(
+            reactivatedContract,
+            "ALERT: Dormant contract has been reactivated - possible rug pull recovery"
         );
     }
     
     /**
-     * @dev Get Telegram config
+     * @dev Alternative response function with more details
+     * @param reactivatedContract Address of the reactivated contract
+     * @param alertMessage Custom alert message
      */
-    function getTelegramConfig() external view returns (TelegramConfig memory) {
-        return telegramConfig;
+    function handleDormantReactivationWithMessage(
+        address reactivatedContract, 
+        string calldata alertMessage
+    ) external {
+        if (reactivatedContract == address(0)) revert InvalidAddress();
+        
+        // Record the reactivation (duplicate logic to avoid recursion)
+        if (reactivations[reactivatedContract].handled) revert AlreadyHandled();
+        
+        reactivations[reactivatedContract] = ReactivationRecord({
+            contractAddress: reactivatedContract,
+            timestamp: block.timestamp,
+            blockNumber: block.number,
+            handled: true
+        });
+        
+        // Add to list if not already there
+        bool exists = false;
+        for (uint256 i = 0; i < reactivatedContracts.length; i++) {
+            if (reactivatedContracts[i] == reactivatedContract) {
+                exists = true;
+                break;
+            }
+        }
+        
+        if (!exists) {
+            reactivatedContracts.push(reactivatedContract);
+        }
+        
+        // Emit events
+        emit DormantContractReactivated(reactivatedContract, block.timestamp, block.number);
+        emit EmergencyAlert(reactivatedContract, alertMessage);
     }
     
     /**
-     * @dev Get dormancy period
+     * @dev Get reactivation details
      */
-    function getDormancyPeriod() external pure returns (uint256) {
-        return DORMANCY_PERIOD;
+    function getReactivationDetails(address contractAddress) 
+        external 
+        view 
+        returns (ReactivationRecord memory) 
+    {
+        return reactivations[contractAddress];
     }
     
     /**
-     * @dev Get activity threshold
+     * @dev Get all reactivated contracts
      */
-    function getActivityThreshold() external pure returns (uint256) {
-        return ACTIVITY_THRESHOLD;
+    function getAllReactivatedContracts() external view returns (address[] memory) {
+        return reactivatedContracts;
     }
     
     /**
-     * @dev Get monitored contracts count
+     * @dev Get count of reactivated contracts
      */
-    function getMonitoredContractsCount() external view returns (uint256) {
-        return monitoredContracts.length;
+    function getReactivatedContractsCount() external view returns (uint256) {
+        return reactivatedContracts.length;
+    }
+    
+    /**
+     * @dev Check if contract has been reactivated
+     */
+    function isReactivated(address contractAddress) external view returns (bool) {
+        return reactivations[contractAddress].handled;
+    }
+    
+    /**
+     * @dev Owner function to manually blacklist a contract
+     */
+    function blacklistContract(address contractAddress) external onlyOwner {
+        if (contractAddress == address(0)) revert InvalidAddress();
+        
+        emit ContractBlacklisted(contractAddress);
+        emit EmergencyAlert(contractAddress, "Contract manually blacklisted by admin");
+    }
+    
+    /**
+     * @dev Reset handling status (for testing)
+     */
+    function resetHandlingStatus(address contractAddress) external onlyOwner {
+        reactivations[contractAddress].handled = false;
     }
     
     /**
      * @dev Transfer ownership
      */
-    function transferOwnership(address _newOwner) external onlyOwner {
-        if (_newOwner == address(0)) revert InvalidAddress();
-        
-        address oldOwner = owner;
-        owner = _newOwner;
-        
-        emit OwnershipTransferred(oldOwner, _newOwner);
-    }
-    
-    /**
-     * @dev Enable/disable Telegram
-     */
-    function setTelegramEnabled(bool _enabled) external onlyOwner {
-        telegramConfig.enabled = _enabled;
+    function transferOwnership(address newOwner) external onlyOwner {
+        if (newOwner == address(0)) revert InvalidAddress();
+        owner = newOwner;
     }
 }
