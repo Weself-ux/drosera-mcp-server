@@ -1,26 +1,10 @@
 {
   "name": "@trap-examples/defi-automation/dormant-contract-monitor",
   "version": "1.0.0",
-  "description": "Drosera trap for monitoring dormant contracts from rug pulls and failed projects",
-  "main": "monitor.js",
-  "scripts": {
-    "start": "node monitor.js",
-    "test": "forge test",
-    "build": "forge build",
-    "deploy": "drosera deploy --config drosera.toml"
-  },
-  "keywords": ["drosera", "trap", "security", "rug-pull", "monitoring", "defi"],
-  "author": "YourName",
-  "license": "MIT",
   "devDependencies": {
     "forge-std": "github:foundry-rs/forge-std#v1.8.1"
   },
   "dependencies": {
-    "contracts": "https://github.com/drosera-network/contracts",
-    "node-telegram-bot-api": "^0.64.0",
-    "web3": "^4.2.2"
-  },
-  "engines": {
-    "node": ">=16.0.0"
+    "contracts": "https://github.com/drosera-network/contracts"
   }
 }
