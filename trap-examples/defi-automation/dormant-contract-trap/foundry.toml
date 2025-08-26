@@ -3,24 +3,5 @@ src = "src"
 out = "out"
 libs = ["node_modules"]
 
-# Hoodi Chain RPC endpoints
 [rpc_endpoints]
-hoodi = "https://eth-hoodi.************" # Your Hoodi chain HTTP RPC
-hoodi_ws = "wss://eth-hoodi.************" # Your Hoodi chain WebSocket RPC
 mainnet = "https://eth.llamarpc.com"
-
-# Compiler settings
-[profile.default.solc]
-version = "0.8.19"
-optimizer = true
-optimizer_runs = 200
-
-# Test configuration
-[profile.test]
-verbosity = 2
-gas_reports = ["*"]
-
-# Deployment configuration
-[profile.deploy]
-optimizer = true
-optimizer_runs = 1000000
