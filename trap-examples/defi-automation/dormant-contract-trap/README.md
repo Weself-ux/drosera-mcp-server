@@ -4,26 +4,59 @@ A Drosera trap that monitors dormant or abandoned smart contracts (especially fr
 
 ## Overview
 
-This trap is designed to catch potential exploitation attempts where bad actors reactivate previously dormant contracts, often seen in:
+This trap monitors specified contracts for periods of inactivity (dormancy) and triggers alerts when the contracts become dormant or reactivate after a period of inactivity. Useful for detecting potential exploitation attempts where bad actors reactivate previously dormant contracts, often seen in:
+
 - Rug pull attempts using old contract infrastructure
 - Exploitation of abandoned DeFi protocols
 - Reactivation of failed project contracts for malicious purposes
+-  legitimate contract reactivations
 
 ## How It Works
 
-1. **Contract Monitoring**: Manually add suspicious or abandoned contracts to the monitoring list
-2. **Dormancy Detection**: Tracks contract inactivity periods (configurable threshold)
-3. **Reactivation Alerts**: Detects when dormant contracts suddenly become active
-4. **Telegram Notifications**: Sends instant alerts with transaction details for immediate investigation
+The trap continuously monitors the contract state including:
+
+Balance changes
+Transaction nonce updates
+Code hash modifications
+
+When the contract shows no activity for 25+ blocks (~5 minutes), it triggers a dormancy alert. If activity resumes, it sends a reactivation alert.
+
+## Component
+
+## DormantContractTrap.sol
+The main trap contract that implements the dormancy detection logic..
+
+## DormantResponseContract.sol
+Receives alerts from Drosera and emits events for external monitoring.
+
+## monitor.js
+Node.js script that listens for dormancy events and sends Telegram notifications.
 
 ## Setup Instructions
 
-### 1. Deploy the Monitor Contract
+1. Deploy the Contracts
 
-1. Open [Remix IDE](https://remix.ethereum.org)
-2. Create and compile `DormantContractMonitor.sol`
-3. Deploy with constructor parameter:
-   - `_inactivityPeriod`: Time in seconds to consider a contract dormant (e.g., 300 for 5 minutes testing)
+2. Create trap configuration file:
+
+bash 
+nano drosera.toml
+
+Add your trap configuration:
+
+nano drosera.toml
+[trap.dormant_trap]
+
+file = "nano src/DormantContractTrap.sol"
+contract = "DormantContractTrap"
+
+file = "nano src/DormantResponseContract.sol"
+contract = "DormantResponseContract"
+function = "notifyDormancyChange"
+
+Deploy with Drosera CLI:
+
+bash
+DROSERA_PRIVATE_KEY=your_private_key drosera apply
 
 ### 2. Configure Telegram Bot
 
@@ -34,11 +67,11 @@ This trap is designed to catch potential exploitation attempts where bad actors 
 ### 3. Setup Node.js Monitor
 
 1. Install dependencies:
-   ```bash
+   bash
    npm install node-telegram-bot-api web3
-   ```
+ 
 
-2. Update configuration in `monitor.js`:
+2. Update configuration in monitor.js:
    ```javascript
    const config = {
        telegramToken: 'YOUR_BOT_TOKEN',
@@ -49,25 +82,21 @@ This trap is designed to catch potential exploitation attempts where bad actors 
    ```
 
 3. Run the monitor:
-   ```bash
+   bash
    node monitor.js
-   ```
+   
 
-### 4. call Contracts to Monitor
+## Testing the Trap
 
-Use Remix to call `addContractToMonitor()` on your deployed contract:
-```solidity
-addContractToMonitor(0x_SUSPICIOUS_CONTRACT_ADDRESS_)
-```
+Once deployed, test your dormant contract monitor:
 
-## Testing
+Check Drosera Dashboard: Verify your trap is active and collecting data (Green Blocks)
+Monitor Logs: Watch the monitor.js console output for activity detection using command prompt
+Wait for Natural Dormancy: The trap will trigger when the monitored contract has no activity for 25+ blocks
+Verify Alerts: Check your Telegram for dormancy notifications when the trap triggers
+Test Response Contract: Ensure the response contract receives and processes alerts correctly
 
-1. Deploy the `TestToken.sol` contract
-2. Add it to monitoring using `addContractToMonitor()`
-3. Wait for the inactivity period to pass
-4. Call `reactivate()` on the test token
-5. Call `checkContractActivity()` with the test token address and `isActive: true`
-6. Verify Telegram alert is received
+The trap automatically monitors the specified contract and will alert when dormancy conditions are met.
 
 ## Key Features
 
@@ -75,7 +104,6 @@ addContractToMonitor(0x_SUSPICIOUS_CONTRACT_ADDRESS_)
 - **Configurable dormancy periods** for different use cases  
 - **Telegram integration** for instant notifications
 - **Transaction tracking** with block and hash details
-- **Manual activation checks** for testing purposes
 - **Health monitoring** with periodic status updates
 
 ## Alert Example
