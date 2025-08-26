@@ -1,185 +1,172 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
 /**
  * @title DormantResponseContract
- * @notice Handles responses when dormant contracts are reactivated
- * @dev This contract is called by Drosera when the DormantContractTrap triggers
+ * @notice Receives dormancy alerts from Drosera Protocol and emits events
+ * @dev Called by Drosera when DormantContractTrap triggers
  */
 contract DormantResponseContract {
-    
-    struct ReactivationRecord {
+
+    struct DormancyAlert {
         address contractAddress;
-        uint256 timestamp;
+        uint256 currentBalance;
+        uint256 lastActiveBlock;
+        uint256 dormantBlocks;
         uint256 blockNumber;
-        bool handled;
+        string alertType;
+        uint256 timestamp;
+        uint256 alertId;
     }
-    
-    address public owner;
-    mapping(address => ReactivationRecord) public reactivations;
-    address[] public reactivatedContracts;
-    
-    // Events
-    event DormantContractReactivated(
-        address indexed contractAddress, 
-        uint256 timestamp, 
-        uint256 blockNumber
+
+    event DormancyStatusChanged(
+        address indexed contractAddress,
+        string indexed alertType,
+        uint256 currentBalance,
+        uint256 lastActiveBlock,
+        uint256 dormantBlocks,
+        uint256 blockNumber,
+        uint256 timestamp,
+        uint256 alertId,
+        string telegramMessage
     );
-    event ContractBlacklisted(address indexed contractAddress);
-    event EmergencyAlert(address indexed contractAddress, string message);
-    
-    // Errors
-    error NotOwner();
-    error InvalidAddress();
-    error AlreadyHandled();
-    
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert NotOwner();
-        _;
-    }
-    
-    constructor() {
-        owner = msg.sender;
-    }
-    
-    /**
-     * @dev Main response function called by Drosera
-     * @param reactivatedContract Address of the contract that became active
-     */
-    function handleDormantReactivation(address reactivatedContract) external {
-        if (reactivatedContract == address(0)) revert InvalidAddress();
-        
-        // Check if already handled to prevent spam
-        if (reactivations[reactivatedContract].handled) revert AlreadyHandled();
-        
-        // Record the reactivation
-        reactivations[reactivatedContract] = ReactivationRecord({
-            contractAddress: reactivatedContract,
-            timestamp: block.timestamp,
-            blockNumber: block.number,
-            handled: true
-        });
-        
-        // Add to list if not already there
-        bool exists = false;
-        for (uint256 i = 0; i < reactivatedContracts.length; i++) {
-            if (reactivatedContracts[i] == reactivatedContract) {
-                exists = true;
-                break;
-            }
+
+    DormancyAlert[] public allAlerts;
+    mapping(address => uint256[]) public contractToAlertIds;
+    mapping(address => uint256) public lastAlertTime;
+
+    uint256 public totalAlerts;
+
+    function notifyDormancyChange(bytes calldata alertData) external {
+        try this.decodeAndProcess(alertData) {
+        } catch {
+            _emitFailedAlert();
         }
+    }
+
+    function decodeAndProcess(bytes calldata alertData) external {
+        require(msg.sender == address(this), "Internal only");
         
-        if (!exists) {
-            reactivatedContracts.push(reactivatedContract);
+        DormancyAlert[] memory alerts = abi.decode(alertData, (DormancyAlert[]));
+
+        for (uint256 i = 0; i < alerts.length; i++) {
+            DormancyAlert memory alert = alerts[i];
+
+            DormancyAlert memory fullAlert = DormancyAlert({
+                contractAddress: alert.contractAddress,
+                currentBalance: alert.currentBalance,
+                lastActiveBlock: alert.lastActiveBlock,
+                dormantBlocks: alert.dormantBlocks,
+                blockNumber: alert.blockNumber,
+                alertType: alert.alertType,
+                timestamp: block.timestamp,
+                alertId: totalAlerts
+            });
+
+            allAlerts.push(fullAlert);
+            contractToAlertIds[alert.contractAddress].push(totalAlerts);
+            lastAlertTime[alert.contractAddress] = block.timestamp;
+
+            emit DormancyStatusChanged(
+                alert.contractAddress,
+                alert.alertType,
+                alert.currentBalance,
+                alert.lastActiveBlock,
+                alert.dormantBlocks,
+                alert.blockNumber,
+                block.timestamp,
+                totalAlerts,
+                _buildTelegramMessage(fullAlert)
+            );
+
+            totalAlerts++;
         }
-        
-        // Emit alert event
-        emit DormantContractReactivated(
-            reactivatedContract,
+    }
+
+    function _emitFailedAlert() internal {
+        emit DormancyStatusChanged(
+            address(0x1e39Bf6C913e9dE1a303a26fdf8557923aA8D1bd),
+            "DECODE_FAILED",
+            0,
+            0,
+            0,
+            block.number,
             block.timestamp,
-            block.number
+            totalAlerts,
+            "Failed to decode trap data"
         );
-        
-        // Emit emergency alert for immediate attention
-        emit EmergencyAlert(
-            reactivatedContract,
-            "ALERT: Dormant contract has been reactivated - possible rug pull recovery"
-        );
+        totalAlerts++;
     }
-    
-    /**
-     * @dev Alternative response function with more details
-     * @param reactivatedContract Address of the reactivated contract
-     * @param alertMessage Custom alert message
-     */
-    function handleDormantReactivationWithMessage(
-        address reactivatedContract, 
-        string calldata alertMessage
-    ) external {
-        if (reactivatedContract == address(0)) revert InvalidAddress();
-        
-        // Record the reactivation (duplicate logic to avoid recursion)
-        if (reactivations[reactivatedContract].handled) revert AlreadyHandled();
-        
-        reactivations[reactivatedContract] = ReactivationRecord({
-            contractAddress: reactivatedContract,
-            timestamp: block.timestamp,
-            blockNumber: block.number,
-            handled: true
-        });
-        
-        // Add to list if not already there
-        bool exists = false;
-        for (uint256 i = 0; i < reactivatedContracts.length; i++) {
-            if (reactivatedContracts[i] == reactivatedContract) {
-                exists = true;
-                break;
-            }
+
+    function _buildTelegramMessage(DormancyAlert memory alert) internal pure returns (string memory) {
+        if (keccak256(bytes(alert.alertType)) == keccak256(bytes("BECAME_DORMANT"))) {
+            return string(abi.encodePacked(
+                " CONTRACT BECAME DORMANT\\n\\n",
+                " Address: ", _addressToString(alert.contractAddress), "\\n",
+                " Balance: ", _uint256ToString(alert.currentBalance), " wei\\n",
+                " Dormant for: ", _uint256ToString(alert.dormantBlocks), " blocks (~",
+                _uint256ToString(alert.dormantBlocks * 12 / 60), " minutes)\\n",
+                " Last Active Block: ", _uint256ToString(alert.lastActiveBlock), "\\n",
+                " Current Block: ", _uint256ToString(alert.blockNumber)
+            ));
+        } else {
+            return string(abi.encodePacked(
+                " CONTRACT REACTIVATED\\n\\n",
+                " Address: ", _addressToString(alert.contractAddress), "\\n",
+                " Current Balance: ", _uint256ToString(alert.currentBalance), " wei\\n",
+                " Activity detected at block: ", _uint256ToString(alert.blockNumber), "\\n",
+                " Status: ACTIVE AGAIN!"
+            ));
         }
-        
-        if (!exists) {
-            reactivatedContracts.push(reactivatedContract);
+    }
+
+    function _addressToString(address addr) internal pure returns (string memory) {
+        bytes32 value = bytes32(uint256(uint160(addr)));
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory str = new bytes(42);
+        str[0] = '0';
+        str[1] = 'x';
+        for (uint256 i = 0; i < 20; i++) {
+            str[2+i*2] = alphabet[uint8(value[i + 12] >> 4)];
+            str[3+i*2] = alphabet[uint8(value[i + 12] & 0x0f)];
         }
-        
-        // Emit events
-        emit DormantContractReactivated(reactivatedContract, block.timestamp, block.number);
-        emit EmergencyAlert(reactivatedContract, alertMessage);
+        return string(str);
     }
-    
-    /**
-     * @dev Get reactivation details
-     */
-    function getReactivationDetails(address contractAddress) 
-        external 
-        view 
-        returns (ReactivationRecord memory) 
-    {
-        return reactivations[contractAddress];
+
+    function _uint256ToString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) return "0";
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
     }
-    
-    /**
-     * @dev Get all reactivated contracts
-     */
-    function getAllReactivatedContracts() external view returns (address[] memory) {
-        return reactivatedContracts;
+
+    function getAllAlerts() external view returns (DormancyAlert[] memory) {
+        return allAlerts;
     }
-    
-    /**
-     * @dev Get count of reactivated contracts
-     */
-    function getReactivatedContractsCount() external view returns (uint256) {
-        return reactivatedContracts.length;
+
+    function getAlertsForContract(address contractAddress) external view returns (DormancyAlert[] memory) {
+        uint256[] memory alertIds = contractToAlertIds[contractAddress];
+        DormancyAlert[] memory contractAlerts = new DormancyAlert[](alertIds.length);
+
+        for (uint256 i = 0; i < alertIds.length; i++) {
+            contractAlerts[i] = allAlerts[alertIds[i]];
+        }
+
+        return contractAlerts;
     }
-    
-    /**
-     * @dev Check if contract has been reactivated
-     */
-    function isReactivated(address contractAddress) external view returns (bool) {
-        return reactivations[contractAddress].handled;
-    }
-    
-    /**
-     * @dev Owner function to manually blacklist a contract
-     */
-    function blacklistContract(address contractAddress) external onlyOwner {
-        if (contractAddress == address(0)) revert InvalidAddress();
-        
-        emit ContractBlacklisted(contractAddress);
-        emit EmergencyAlert(contractAddress, "Contract manually blacklisted by admin");
-    }
-    
-    /**
-     * @dev Reset handling status (for testing)
-     */
-    function resetHandlingStatus(address contractAddress) external onlyOwner {
-        reactivations[contractAddress].handled = false;
-    }
-    
-    /**
-     * @dev Transfer ownership
-     */
-    function transferOwnership(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) revert InvalidAddress();
-        owner = newOwner;
+
+    function getLatestAlert() external view returns (DormancyAlert memory) {
+        require(totalAlerts > 0, "No alerts yet");
+        return allAlerts[totalAlerts - 1];
     }
 }
