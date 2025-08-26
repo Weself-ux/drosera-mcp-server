@@ -1,94 +1,151 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.19;
 
-import {ITrap} from "drosera-contracts/interfaces/ITrap.sol";
+import {ITrap} from "contracts/interfaces/ITrap.sol";
 
 /**
  * @title DormantContractTrap
- * @notice Monitor dormant/abandoned smart contracts and detect when they become active
- * @dev Drosera trap that monitors contracts from rug pulls or failed projects
+ * @notice Monitors contract for dormancy - detects when contract becomes inactive
+ * @dev Trap that detects when monitored addresses have no activity for 25+ blocks
  */
 contract DormantContractTrap is ITrap {
-    
-    uint256 constant DORMANCY_PERIOD = 5 minutes; // Consider dormant after 5 minutes (for testing)
-    uint256 constant ACTIVITY_THRESHOLD = 0.0001 ether; // Minimum balance change to consider active
-    
-    // Contracts to monitor (replace with actual rug pull contract addresses)
-    address[] public monitoredContracts;
-    mapping(address => uint256) public lastKnownBalance;
-    mapping(address => uint256) public lastActivityTimestamp;
-    
-    constructor() {
-        // Add example contracts to monitor (replace with actual rug pull addresses)
-        monitoredContracts.push(0x9F22B165DC6282ea434CC67619Ea6999ff3af2cf);
-        
-        // Initialize last known balances and timestamps
-        for (uint256 i = 0; i < monitoredContracts.length; i++) {
-            address contractAddr = monitoredContracts[i];
-            lastKnownBalance[contractAddr] = contractAddr.balance;
-            lastActivityTimestamp[contractAddr] = block.timestamp;
-        }
+
+    struct ContractSnapshot {
+        address contractAddress;
+        uint256 balance;
+        uint256 nonce;
+        uint256 blockNumber;
+        uint256 timestamp;
+        bytes32 codeHash;
     }
+
+    struct DormancyAlert {
+        address contractAddress;
+        uint256 currentBalance;
+        uint256 lastActiveBlock;
+        uint256 dormantBlocks;
+        uint256 blockNumber;
+        string alertType;
+    }
+
+    uint256 constant DORMANCY_THRESHOLD_BLOCKS = 25;
     
-    /**
-     * @dev ITrap implementation - collect data about monitored contracts
-     */
-    function collect() external view returns (bytes memory) {
-        bool hasReactivation = false;
-        address reactivatedContract = address(0);
-        
+    address[] public monitoredContracts;
+
+    constructor() {
+        monitoredContracts.push(0x1e39Bf6C913e9dE1a303a26fdf8557923aA8D1bd);
+    }
+
+    function collect() external view override returns (bytes memory) {
+        ContractSnapshot[] memory snapshots = new ContractSnapshot[](monitoredContracts.length);
+
         for (uint256 i = 0; i < monitoredContracts.length; i++) {
             address contractAddr = monitoredContracts[i];
-            uint256 currentBalance = contractAddr.balance;
-            uint256 lastBalance = lastKnownBalance[contractAddr];
-            uint256 lastActivity = lastActivityTimestamp[contractAddr];
-            
-            // Check if contract is dormant (inactive for 5+ minutes)
-            bool isDormant = (block.timestamp - lastActivity) >= DORMANCY_PERIOD;
-            
-            // Check if there's significant balance change (0.0001+ ETH)
-            uint256 balanceChange = currentBalance > lastBalance 
-                ? currentBalance - lastBalance 
-                : lastBalance - currentBalance;
-            bool hasActivity = balanceChange >= ACTIVITY_THRESHOLD;
-            
-            // If dormant contract shows activity, flag for alert
-            if (isDormant && hasActivity) {
-                hasReactivation = true;
-                reactivatedContract = contractAddr;
-                break;
+
+            snapshots[i] = ContractSnapshot({
+                contractAddress: contractAddr,
+                balance: contractAddr.balance,
+                nonce: _getNonce(contractAddr),
+                blockNumber: block.number,
+                timestamp: block.timestamp,
+                codeHash: contractAddr.codehash
+            });
+        }
+
+        return abi.encode(snapshots);
+    }
+
+    function shouldRespond(bytes[] calldata data)
+        external
+        pure
+        override
+        returns (bool shouldTrigger, bytes memory responseData)
+    {
+        if (data.length < 2) {
+            return (false, "");
+        }
+
+        ContractSnapshot[] memory currentSnapshots = abi.decode(data[0], (ContractSnapshot[]));
+        ContractSnapshot[] memory olderSnapshots = abi.decode(data[data.length - 1], (ContractSnapshot[]));
+
+        DormancyAlert[] memory alerts = new DormancyAlert[](currentSnapshots.length);
+        uint256 alertCount = 0;
+
+        for (uint256 i = 0; i < currentSnapshots.length; i++) {
+            ContractSnapshot memory current = currentSnapshots[i];
+            ContractSnapshot memory older = olderSnapshots[i];
+
+            uint256 blocksSinceLastActivity = current.blockNumber - older.blockNumber;
+            bool hasActivity = _hasActivityBetweenSnapshots(current, older);
+
+            if (!hasActivity && blocksSinceLastActivity >= DORMANCY_THRESHOLD_BLOCKS) {
+                alerts[alertCount++] = DormancyAlert({
+                    contractAddress: current.contractAddress,
+                    currentBalance: current.balance,
+                    lastActiveBlock: older.blockNumber,
+                    dormantBlocks: blocksSinceLastActivity,
+                    blockNumber: current.blockNumber,
+                    alertType: "BECAME_DORMANT"
+                });
+            } else if (hasActivity) {
+                alerts[alertCount++] = DormancyAlert({
+                    contractAddress: current.contractAddress,
+                    currentBalance: current.balance,
+                    lastActiveBlock: current.blockNumber,
+                    dormantBlocks: 0,
+                    blockNumber: current.blockNumber,
+                    alertType: "REACTIVATED"
+                });
             }
         }
-        
-        return abi.encode(hasReactivation, reactivatedContract);
-    }
-    
-    /**
-     * @dev ITrap implementation - determine if trap should respond
-     * NOTE: Must be pure to match ITrap interface
-     */
-    function shouldRespond(bytes[] calldata data) external pure returns (bool, bytes memory) {
-        (bool hasReactivation, address contractAddr) = abi.decode(data[0], (bool, address));
-        
-        if (!hasReactivation || contractAddr == address(0)) {
-            return (false, bytes(""));
+
+        if (alertCount > 0) {
+            DormancyAlert[] memory result = new DormancyAlert[](alertCount);
+            for (uint256 i = 0; i < alertCount; i++) {
+                result[i] = alerts[i];
+            }
+            return (true, abi.encode(result));
         }
-        
-        return (true, abi.encode(contractAddr));
+
+        return (false, "");
     }
-    
-    /**
-     * @dev Manual function to update state after detection (called by owner)
-     */
-    function updateContractState(address contractAddr) external {
-        lastKnownBalance[contractAddr] = contractAddr.balance;
-        lastActivityTimestamp[contractAddr] = block.timestamp;
+
+    function _hasActivityBetweenSnapshots(
+        ContractSnapshot memory current,
+        ContractSnapshot memory older
+    ) internal pure returns (bool) {
+        return (
+            current.balance != older.balance ||
+            current.nonce != older.nonce ||
+            current.codeHash != older.codeHash
+        );
     }
-    
-    /**
-     * @dev Get list of monitored contracts
-     */
+
+    function _getNonce(address addr) internal view returns (uint256) {
+        uint256 size;
+        assembly {
+            size := extcodesize(addr)
+        }
+
+        if (size > 0) {
+            return 1;
+        } else {
+            return _getEOANonce(addr);
+        }
+    }
+
+    function _getEOANonce(address addr) internal view returns (uint256 nonce) {
+        assembly {
+            nonce := extcodehash(addr)
+        }
+        return nonce;
+    }
+
     function getMonitoredContracts() external view returns (address[] memory) {
         return monitoredContracts;
+    }
+
+    function addMonitoredContract(address contractAddr) external {
+        monitoredContracts.push(contractAddr);
     }
 }
