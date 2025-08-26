@@ -34,14 +34,15 @@ Node.js script that listens for dormancy events and sends Telegram notifications
 
 ## Setup Instructions
 
-1. Deploy the Contracts
+1. Deploy the DormantResponseContract.sol on hoodi chain
 
 2. Create trap configuration file:
 
 bash 
+
 nano drosera.toml
 
-Add your trap configuration:
+## Add your trap configuration:
 
 nano drosera.toml
 [trap.dormant_trap]
@@ -53,9 +54,10 @@ file = "nano src/DormantResponseContract.sol"
 contract = "DormantResponseContract"
 function = "notifyDormancyChange"
 
-Deploy with Drosera CLI:
+## Deploy with Drosera CLI
 
 bash
+forge build
 DROSERA_PRIVATE_KEY=your_private_key drosera apply
 
 ### 2. Configure Telegram Bot
@@ -91,9 +93,13 @@ DROSERA_PRIVATE_KEY=your_private_key drosera apply
 Once deployed, test your dormant contract monitor:
 
 Check Drosera Dashboard: Verify your trap is active and collecting data (Green Blocks)
+
 Monitor Logs: Watch the monitor.js console output for activity detection using command prompt
+
 Wait for Natural Dormancy: The trap will trigger when the monitored contract has no activity for 25+ blocks
+
 Verify Alerts: Check your Telegram for dormancy notifications when the trap triggers
+
 Test Response Contract: Ensure the response contract receives and processes alerts correctly
 
 The trap automatically monitors the specified contract and will alert when dormancy conditions are met.
