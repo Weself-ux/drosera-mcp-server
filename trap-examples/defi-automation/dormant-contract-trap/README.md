@@ -48,16 +48,21 @@ nano drosera.toml
 [trap.dormant_trap]
 
 file = "nano src/DormantContractTrap.sol"
+
 contract = "DormantContractTrap"
 
 file = "nano src/DormantResponseContract.sol"
+
 contract = "DormantResponseContract"
+
 function = "notifyDormancyChange"
 
 ## Deploy with Drosera CLI
 
 bash
+
 forge build
+
 DROSERA_PRIVATE_KEY=your_private_key drosera apply
 
 ### 2. Configure Telegram Bot
