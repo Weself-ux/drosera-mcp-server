@@ -3,8 +3,8 @@ pragma solidity ^0.8.19;
 
 /**
  * @title DormantResponseContract
- * @notice Receives dormancy alerts from Drosera Protocol and emits events
- * @dev Called by Drosera when DormantContractTrap triggers
+ * @notice Receives reactivation alerts from Drosera Protocol and emits events
+ * @dev Called by Drosera when DormantContractTrap detects activity
  */
 contract DormantResponseContract {
 
@@ -15,13 +15,11 @@ contract DormantResponseContract {
         uint256 dormantBlocks;
         uint256 blockNumber;
         string alertType;
-        uint256 timestamp;
-        uint256 alertId;
     }
 
     event DormancyStatusChanged(
         address indexed contractAddress,
-        string indexed alertType,
+        bytes32 indexed alertType,
         uint256 currentBalance,
         uint256 lastActiveBlock,
         uint256 dormantBlocks,
@@ -52,31 +50,22 @@ contract DormantResponseContract {
         for (uint256 i = 0; i < alerts.length; i++) {
             DormancyAlert memory alert = alerts[i];
 
-            DormancyAlert memory fullAlert = DormancyAlert({
-                contractAddress: alert.contractAddress,
-                currentBalance: alert.currentBalance,
-                lastActiveBlock: alert.lastActiveBlock,
-                dormantBlocks: alert.dormantBlocks,
-                blockNumber: alert.blockNumber,
-                alertType: alert.alertType,
-                timestamp: block.timestamp,
-                alertId: totalAlerts
-            });
-
-            allAlerts.push(fullAlert);
+            allAlerts.push(alert);
             contractToAlertIds[alert.contractAddress].push(totalAlerts);
             lastAlertTime[alert.contractAddress] = block.timestamp;
 
+            bytes32 alertTypeHash = keccak256(bytes(alert.alertType));
+
             emit DormancyStatusChanged(
                 alert.contractAddress,
-                alert.alertType,
+                alertTypeHash,
                 alert.currentBalance,
                 alert.lastActiveBlock,
                 alert.dormantBlocks,
                 alert.blockNumber,
                 block.timestamp,
                 totalAlerts,
-                _buildTelegramMessage(fullAlert)
+                _buildTelegramMessage(alert)
             );
 
             totalAlerts++;
@@ -84,9 +73,10 @@ contract DormantResponseContract {
     }
 
     function _emitFailedAlert() internal {
+        bytes32 failedTypeHash = keccak256(bytes("DECODE_FAILED"));
         emit DormancyStatusChanged(
             address(0x1e39Bf6C913e9dE1a303a26fdf8557923aA8D1bd),
-            "DECODE_FAILED",
+            failedTypeHash,
             0,
             0,
             0,
@@ -99,25 +89,13 @@ contract DormantResponseContract {
     }
 
     function _buildTelegramMessage(DormancyAlert memory alert) internal pure returns (string memory) {
-        if (keccak256(bytes(alert.alertType)) == keccak256(bytes("BECAME_DORMANT"))) {
-            return string(abi.encodePacked(
-                " CONTRACT BECAME DORMANT\\n\\n",
-                " Address: ", _addressToString(alert.contractAddress), "\\n",
-                " Balance: ", _uint256ToString(alert.currentBalance), " wei\\n",
-                " Dormant for: ", _uint256ToString(alert.dormantBlocks), " blocks (~",
-                _uint256ToString(alert.dormantBlocks * 12 / 60), " minutes)\\n",
-                " Last Active Block: ", _uint256ToString(alert.lastActiveBlock), "\\n",
-                " Current Block: ", _uint256ToString(alert.blockNumber)
-            ));
-        } else {
-            return string(abi.encodePacked(
-                " CONTRACT REACTIVATED\\n\\n",
-                " Address: ", _addressToString(alert.contractAddress), "\\n",
-                " Current Balance: ", _uint256ToString(alert.currentBalance), " wei\\n",
-                " Activity detected at block: ", _uint256ToString(alert.blockNumber), "\\n",
-                " Status: ACTIVE AGAIN!"
-            ));
-        }
+        return string(abi.encodePacked(
+            "CONTRACT REACTIVATED\\n\\n",
+            "Address: ", _addressToString(alert.contractAddress), "\\n",
+            "Current Balance: ", _uint256ToString(alert.currentBalance), " wei\\n",
+            "Activity detected at block: ", _uint256ToString(alert.blockNumber), "\\n",
+            "Status: ACTIVE - Previously dormant contract is now showing activity!"
+        ));
     }
 
     function _addressToString(address addr) internal pure returns (string memory) {
