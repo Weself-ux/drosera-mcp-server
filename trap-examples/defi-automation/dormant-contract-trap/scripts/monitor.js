@@ -2,10 +2,10 @@ const TelegramBot = require('node-telegram-bot-api');
 const { Web3 } = require('web3');
 
 const config = {
-    telegramToken: '8279269014:AAEGX1zjqLSkGpd2a6abqk8vc1mUaDAhubA',
-    contractAddress: '0xf6B0B7A6ec7E406d8EB30c4DfAD13C55e971cE7e',
-    rpcUrl: 'wss://eth-hoodi.g.alchemy.com/v2/6sgd1Sp3usg4zOi5y90j1',
-    chatId: '7087390212'
+    telegramToken: "TELEGRAM_BOT_TOKEN"
+    contractAddress: "RESPONSE_CONTRACT_ADDRESS"
+    rpcUrl: "RPC_URL"
+    chatId: "TELEGRAM_CHAT_ID"
 };
 
 const bot = new TelegramBot(config.telegramToken, { polling: true });
@@ -23,9 +23,9 @@ const contractABI = [
             },
             {
                 "indexed": true,
-                "internalType": "string",
+                "internalType": "bytes32",
                 "name": "alertType",
-                "type": "string"
+                "type": "bytes32"
             },
             {
                 "internalType": "uint256",
@@ -74,20 +74,25 @@ function formatTimestamp(timestamp) {
     return new Date(Number(timestamp) * 1000).toLocaleString();
 }
 
-function formatBalance(balance) {
-    return (Number(balance) / 1e18).toFixed(6);
+function getAlertTypeFromHash(alertTypeHash) {
+    const reactivatedHash = web3.utils.keccak256('REACTIVATED');
+    const decodeFailedHash = web3.utils.keccak256('DECODE_FAILED');
+    
+    if (alertTypeHash === reactivatedHash) return 'REACTIVATED';
+    if (alertTypeHash === decodeFailedHash) return 'DECODE_FAILED';
+    return 'UNKNOWN';
 }
 
 function buildAlertMessage(data, transactionHash) {
     const {
-        alertType,
+        contractAddress,
         blockNumber,
         timestamp
     } = data;
 
     return `🚨 DROSERA ALERT 🚨
 🔍 Dormant Contract Activated!
-📧 Contract: 0x1e39Bf6C913e9dE1a303a26fdf8557923aA8D1bd
+📧 Contract: ${contractAddress}
 ⏰ Activation Time: ${formatTimestamp(timestamp)}
 🔗 Block: ${blockNumber}
 📋 Transaction: ${transactionHash}
@@ -115,7 +120,9 @@ const dormancyEvents = contract.events.DormancyStatusChanged({
 });
 
 dormancyEvents.on('data', async (event) => {
-    console.log('Dormancy event:', event.returnValues.alertType);
+    const alertType = getAlertTypeFromHash(event.returnValues.alertType);
+    console.log('Dormancy event:', alertType);
+    
     const message = buildAlertMessage(event.returnValues, event.transactionHash);
     await sendAlert(message);
 });
