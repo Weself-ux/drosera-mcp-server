@@ -13,9 +13,17 @@ This trap monitors a specified contract address and triggers alerts when the con
 
 ## How It Works
 
-The trap continuously monitors the contract address
+The trap monitors a known dormant contract address for any signs of reactivation..
 
-When the contract shows no activity for 10 blocks (~5 minutes), it triggers a dormancy alert. If activity resumes, it sends a reactivation alert.
+Since the monitored contract is presumed dormant, the trap operates as a "dead man's switch"  any detected activity (balance changes) triggers an immediate reactivation alert.
+
+## Detection Logic
+
+Monitors contract balance every block
+If balance changes detected = Contract reactivated
+Sends immediate alert for investigation
+
+The contract is already known to be dormant, so any activity indicates potential reactivation, rug pull, or exploitation attempt.
 
 ## Component
 
