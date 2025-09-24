@@ -97,9 +97,9 @@ function buildAlertMessage(data, transactionHash) {
 🔗 Block: ${blockNumber}
 📋 Transaction: ${transactionHash}
 ⚠️ This contract was previously dormant and has suddenly become active. This could indicate:
-• Rug pull attempt
-• Exploitation attempt  
-• Legitimate reactivation
+- Rug pull attempt
+- Exploitation attempt  
+- Legitimate reactivation
 🔍 Investigate immediately!`;
 }
 
