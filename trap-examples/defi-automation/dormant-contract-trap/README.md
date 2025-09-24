@@ -4,22 +4,18 @@ A Drosera trap that monitors dormant or abandoned smart contracts (especially fr
 
 ## Overview
 
-This trap monitors specified contracts for periods of inactivity (dormancy) and triggers alerts when the contracts become dormant or reactivate after a period of inactivity. Useful for detecting potential exploitation attempts where bad actors reactivate previously dormant contracts, often seen in:
+This trap monitors a specified contract address and triggers alerts when the contracts become reactivate after a period of inactivity. Useful for detecting potential exploitation attempts where bad actors reactivate previously dormant contracts, often seen in:
 
 - Rug pull attempts using old contract infrastructure
 - Exploitation of abandoned DeFi protocols
 - Reactivation of failed project contracts for malicious purposes
--  legitimate contract reactivations
+- legitimate contract reactivations
 
 ## How It Works
 
-The trap continuously monitors the contract state including:
+The trap continuously monitors the contract address
 
-Balance changes
-Transaction nonce updates
-Code hash modifications
-
-When the contract shows no activity for 25+ blocks (~5 minutes), it triggers a dormancy alert. If activity resumes, it sends a reactivation alert.
+When the contract shows no activity for 10 blocks (~5 minutes), it triggers a dormancy alert. If activity resumes, it sends a reactivation alert.
 
 ## Component
 
