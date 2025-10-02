@@ -5,8 +5,8 @@ import {ITrap} from "contracts/interfaces/ITrap.sol";
 
 /**
  * @title DormantContractTrap
- * @notice Monitors dormant contract for any reactivation activity
- * @dev Simple dead man's switch - alerts on any signs of life from dormant contract
+ * @notice Monitors dormant contract for reactivation
+ * @dev Detects when a stable contract becomes active again
  */
 contract DormantContractTrap is ITrap {
 
@@ -57,39 +57,68 @@ contract DormantContractTrap is ITrap {
         override
         returns (bool shouldTrigger, bytes memory responseData)
     {
-        if (data.length == 0) {
+        uint256 olderN = 20;
+        uint256 newerM = 5;
+
+        if (data.length < olderN + newerM) {
             return (false, "");
         }
 
-        ContractSnapshot[] memory currentSnapshots = abi.decode(data[0], (ContractSnapshot[]));
-        
-        DormancyAlert[] memory alerts = new DormancyAlert[](currentSnapshots.length);
+        ContractSnapshot[] memory newest = abi.decode(data[0], (ContractSnapshot[]));
+        uint256 n = newest.length;
+        if (n == 0) return (false, "");
+
+        DormancyAlert[] memory alerts = new DormancyAlert[](n);
         uint256 alertCount = 0;
 
-        for (uint256 i = 0; i < currentSnapshots.length; i++) {
-            ContractSnapshot memory current = currentSnapshots[i];
+        for (uint256 i = 0; i < n; i++) {
+            address addr = newest[i].contractAddress;
 
-            // Check if dormant contract shows any signs of activity
-            if (current.balance > 0) {
-                alerts[alertCount++] = DormancyAlert({
-                    contractAddress: current.contractAddress,
-                    currentBalance: current.balance,
-                    lastActiveBlock: current.blockNumber,
-                    dormantBlocks: 0,
-                    blockNumber: current.blockNumber,
-                    alertType: "REACTIVATED"
-                });
+            ContractSnapshot memory baseline = abi.decode(data[newerM], (ContractSnapshot[]))[i];
+
+            bool olderStable = true;
+            for (uint256 j = newerM; j < olderN + newerM; j++) {
+                ContractSnapshot memory snap = abi.decode(data[j], (ContractSnapshot[]))[i];
+                if (snap.balance != baseline.balance || snap.codeHash != baseline.codeHash) {
+                    olderStable = false;
+                    break;
+                }
             }
+
+            if (!olderStable) {
+                continue;
+            }
+
+            bool changedNow = false;
+            for (uint256 j = 0; j < newerM; j++) {
+                ContractSnapshot memory snap = abi.decode(data[j], (ContractSnapshot[]))[i];
+                if (snap.balance != baseline.balance || snap.codeHash != baseline.codeHash) {
+                    changedNow = true;
+                    break;
+                }
+            }
+
+            if (!changedNow) {
+                continue;
+            }
+
+            ContractSnapshot memory cur = newest[i];
+            uint256 dormantBlocks = cur.blockNumber - abi.decode(data[newerM], (ContractSnapshot[]))[i].blockNumber;
+
+            alerts[alertCount++] = DormancyAlert({
+                contractAddress: addr,
+                currentBalance: cur.balance,
+                lastActiveBlock: cur.blockNumber,
+                dormantBlocks: dormantBlocks,
+                blockNumber: cur.blockNumber,
+                alertType: "REACTIVATED"
+            });
         }
 
-        if (alertCount > 0) {
-            DormancyAlert[] memory result = new DormancyAlert[](alertCount);
-            for (uint256 i = 0; i < alertCount; i++) {
-                result[i] = alerts[i];
-            }
-            return (true, abi.encode(result));
-        }
+        if (alertCount == 0) return (false, "");
 
-        return (false, "");
+        DormancyAlert[] memory result = new DormancyAlert[](alertCount);
+        for (uint256 k = 0; k < alertCount; k++) result[k] = alerts[k];
+        return (true, abi.encode(result));
     }
 }
