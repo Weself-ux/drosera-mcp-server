@@ -1,6 +1,6 @@
 # Dormant Contract Reactivation Trap
 
-A Drosera trap that monitors dormant or abandoned smart contracts (especially from rug-pulled or failed projects) and detects when they suddenly become active again, sending real-time alerts via Telegram.
+A Drosera trap that monitors dormant or abandoned smart contracts (especially from rug-pulled or failed projects) for dormancy detection and reactivation alerts, sending real-time alerts via Telegram.
 
 ## Overview
 
@@ -13,17 +13,26 @@ This trap monitors a specified contract address and triggers alerts when the con
 
 ## How It Works
 
-The trap monitors a known dormant contract address for any signs of reactivation..
-
-Since the monitored contract is presumed dormant, the trap operates as a "dead man's switch"  any detected activity (balance changes) triggers an immediate reactivation alert.
+The trap uses a two window approach to reliably detect contract reactivation.
 
 ## Detection Logic
 
-Monitors contract balance every block
-If balance changes detected = Contract reactivated
-Sends immediate alert for investigation
+Older Window (20 blocks): Must show complete stability (no balance or codehash changes)
 
-The contract is already known to be dormant, so any activity indicates potential reactivation, rug pull, or exploitation attempt.
+Newer Window (5 blocks): Must show activity (balance or codehash changes)
+
+## Logic:
+
+- Monitors contract across 30+ block history
+- Verifies older window (blocks 5-25) remained dormant with no state changes
+- Checks newer window (blocks 0-4) for activity
+- Only triggers "REACTIVATED" alert when both conditions are met:
+
+Older window was stable (proving dormancy)
+
+Newer window shows changes (proving reactivation)
+
+This approach eliminates false positives by requiring proof of both dormancy and reactivation, rather than just detecting current activity.
 
 ## Component
 
